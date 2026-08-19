@@ -1,6 +1,6 @@
 {
   "name": "agentic-gate",
-  "version": "1.1.3",
+  "version": "1.1.4",
   "description": "Deterministic schema validation gates and circuit breakers for LLM function calling",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
