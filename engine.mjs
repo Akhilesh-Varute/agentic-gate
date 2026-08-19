@@ -1,39 +1,42 @@
-import dotenv from "dotenv";
-dotenv.config();
-
 import { BedrockRuntimeClient, ConverseCommand } from "@aws-sdk/client-bedrock-runtime";
+import { AgenticGate } from "./dist/index.js";
 import { z } from "zod";
 
-// Initialize AWS Bedrock Client via local AWS CLI credentials
-const bedrockClient = new BedrockRuntimeClient({ 
-  region: process.env.AWS_REGION || "us-east-1" 
-});
+// 1. Initialize AWS Bedrock Client
+const bedrockClient = new BedrockRuntimeClient({ region: "us-east-1" });
+const MODEL_ID = "us.anthropic.claude-haiku-4-5-20251001-v1:0";
 
-const MODEL_ID = process.env.BEDROCK_MODEL_ID || "us.anthropic.claude-haiku-4-5-20251001-v1:0";
+// 2. Instantiate and Configure the Deterministic AgenticGate
+const gate = new AgenticGate();
 
-// 1. Define Strict Zod Schema for Tool Parameters
-const EC2RestartSchema = z.object({
-  instanceId: z.string().regex(/^i-[a-f0-9]{8,17}$/, "Invalid AWS Instance ID format (must start with i- followed by hex chars)"),
-  region: z.enum(["us-east-1", "us-west-2", "ap-south-1"], {
-    errorMap: () => ({ message: "Region must be one of: us-east-1, us-west-2, ap-south-1" })
+gate.registerTool({
+  name: "restart_ec2_instance",
+  schema: z.object({
+    instanceId: z.string().regex(/^i-[a-f0-9]{8,17}$/, "Invalid AWS EC2 Instance ID format"),
+    region: z.enum(["us-east-1", "us-west-2", "ap-south-1"], {
+      errorMap: () => ({ message: "Region must be one of: us-east-1, us-west-2, ap-south-1" })
+    })
   }),
-  force: z.boolean().default(false)
+  execute: async ({ instanceId, region }) => {
+    // Downstream execution (e.g., AWS SDK call)
+    console.log(`⚡ [Safe Execution]: Calling AWS EC2 SDK to restart ${instanceId} in ${region}...`);
+    return { status: "success", instanceId, region, action: "reboot_initiated" };
+  }
 });
 
-// 2. Define Bedrock Tool Spec (for Claude via Converse API)
+// 3. Define Bedrock Tool Spec matching the Zod schema
 const toolConfig = {
   tools: [
     {
       toolSpec: {
         name: "restart_ec2_instance",
-        description: "Restarts an AWS EC2 instance in a specified region.",
+        description: "Restarts a specific AWS EC2 instance in a supported region.",
         inputSchema: {
           json: {
             type: "object",
             properties: {
               instanceId: { type: "string", description: "The EC2 instance ID (e.g., i-0123456789abcdef0)" },
-              region: { type: "string", description: "AWS region name (e.g., ap-south-1)" },
-              force: { type: "boolean", description: "Force stop instance if non-responsive" }
+              region: { type: "string", description: "The target AWS region" }
             },
             required: ["instanceId", "region"]
           }
@@ -43,102 +46,83 @@ const toolConfig = {
   ]
 };
 
-// 3. Simulated Tool Execution Function
-async function executeEC2Restart(validArgs) {
-  console.log(`\n⚙️ [AWS API CALL SIMULATION] Restarting EC2 ${validArgs.instanceId} in ${validArgs.region}...`);
-  return { status: "SUCCESS", instanceId: validArgs.instanceId, state: "rebooting" };
-}
+// 4. Main Deterministic Execution Loop
+async function runEngine() {
+  const prompt = "Please restart instance i-0123456789abcdef0 in Frankfurt (eu-central-1)";
+  console.log(`\n🚀 Starting Engine Execution for Prompt: "${prompt}"`);
+  console.log(`📡 Using Bedrock Model: ${MODEL_ID}\n`);
 
-// 4. Deterministic State Engine
-export async function runAgentLoop(userPrompt, maxRetries = 3) {
-  let attempt = 0;
-  let messages = [{ role: "user", content: [{ text: userPrompt }] }];
+  const messages = [
+    {
+      role: "user",
+      content: [{ text: prompt }]
+    }
+  ];
 
-  console.log(`\n🚀 Starting Engine Execution for Prompt: "${userPrompt}"`);
-  console.log(`📡 Using Bedrock Model: ${MODEL_ID}`);
+  const MAX_RETRIES = 3;
+  let attempts = 0;
 
-  while (attempt < maxRetries) {
-    attempt++;
-    console.log(`\n--- Loop Attempt ${attempt}/${maxRetries} ---`);
+  while (attempts < MAX_RETRIES) {
+    attempts++;
+    console.log(`--- Loop Attempt ${attempts}/${MAX_RETRIES} ---`);
 
-    try {
-      // Step A: Invoke Bedrock Converse API
-      const command = new ConverseCommand({
-        modelId: MODEL_ID, 
-        messages: messages,
-        toolConfig: toolConfig
-      });
+    const command = new ConverseCommand({
+      modelId: MODEL_ID,
+      messages: messages,
+      toolConfig: toolConfig
+    });
 
-      const response = await bedrockClient.send(command);
-      const outputMessage = response.output.message;
-      messages.push(outputMessage);
+    const response = await bedrockClient.send(command);
+    const assistantMessage = response.output.message;
+    messages.push(assistantMessage);
 
-      // Step B: Check if Model Requested a Tool Call
-      const toolUseContent = outputMessage.content.find(c => c.toolUse);
+    // Check if the LLM requested a tool execution
+    const toolUseBlock = assistantMessage.content.find((block) => block.toolUse);
 
-      if (!toolUseContent) {
-        // Normal text response (e.g., when model explains that the region is unsupported)
-        const textResponse = outputMessage.content.find(c => c.text)?.text;
-        console.log(`\n🤖 [Model Feedback]: ${textResponse}`);
-        return { status: "COMPLETED", response: textResponse, attemptsUsed: attempt };
-      }
-
-      const { toolUseId, name: toolName, input: rawToolInput } = toolUseContent.toolUse;
-      console.log(`[Bedrock Tool Requested]: "${toolName}" with input:`, rawToolInput);
-
-      // Step C: Schema Validation Gate (Zod)
-      if (toolName === "restart_ec2_instance") {
-        const validation = EC2RestartSchema.safeParse(rawToolInput);
-
-        if (validation.success) {
-          console.log(`✅ [Validation Gate PASSED]: Schema parameters are valid.`);
-          
-          const executionResult = await executeEC2Restart(validation.data);
-
-          messages.push({
-            role: "user",
-            content: [{
-              toolResult: {
-                toolUseId: toolUseId,
-                status: "success",
-                content: [{ json: executionResult }]
-              }
-            }]
-          });
-
-          return { status: "SUCCESS", result: executionResult, attemptsUsed: attempt };
-
-        } else {
-          const errorList = validation.error.issues.map(i => i.message).join("; ");
-          console.warn(`❌ [Validation Gate FAILED]: ${errorList}`);
-
-          // Feedback validation error into message history so Bedrock can self-correct
-          messages.push({
-            role: "user",
-            content: [{
-              toolResult: {
-                toolUseId: toolUseId,
-                status: "error",
-                content: [{ text: `Validation Error: ${errorList}. Valid regions are us-east-1, us-west-2, or ap-south-1.` }]
-              }
-            }]
-          });
-
-          // Continue loop for attempt 2
-          continue;
-        }
-      }
-
-    } catch (err) {
-      console.error(`🚨 Runtime Exception in Engine Loop:`, err.message);
+    if (!toolUseBlock) {
+      // Final textual response from the model
+      const textOutput = assistantMessage.content.find((block) => block.text)?.text;
+      console.log(`\n🤖 [Model Response]:\n${textOutput}\n`);
       break;
     }
-  }
 
-  // Circuit Breaker Triggered
-  console.error(`\n🚨 [Circuit Breaker Triggered] Max retries (${maxRetries}) reached without valid tool payload.`);
-  return { status: "CIRCUIT_BREAKER_TRIGGERED", attemptsUsed: attempt };
+    const { toolUseId, name: toolName, input: rawInput } = toolUseBlock.toolUse;
+    console.log(`[Bedrock Tool Requested]: "${toolName}" with input:`, rawInput);
+
+    // Intercept tool execution using the AgenticGate
+    const gateResult = await gate.interceptAndExecute(toolName, rawInput);
+
+    if (gateResult.success) {
+      console.log(`✅ [Validation Gate PASSED]: Execution Successful!`);
+      messages.push({
+        role: "user",
+        content: [
+          {
+            toolResult: {
+              toolUseId: toolUseId,
+              status: "success",
+              content: [{ json: gateResult.data }]
+            }
+          }
+        ]
+      });
+    } else {
+      console.log(`❌ ${gateResult.error}`);
+      // Inject validation error trace back into history for model self-correction
+      messages.push({
+        role: "user",
+        content: [
+          {
+            toolResult: {
+              toolUseId: toolUseId,
+              status: "error",
+              content: [{ text: gateResult.error }]
+            }
+          }
+        ]
+      });
+    }
+  }
 }
 
-// Demo Test Call
-runAgentLoop("Please restart instance i-0123456789abcdef0 in Frankfurt (eu-central-1)");
+runEngine().catch(console.error);
