@@ -17,9 +17,14 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-          registry-url: "https://registry.npmjs.org"
+          # NOTE: deliberately no registry-url here. Setting it makes setup-node
+          # write //registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN} into .npmrc.
+          # Since we don't set NODE_AUTH_TOKEN (trusted publishing needs no token),
+          # that expands to an empty token and npm tries classic auth instead of
+          # OIDC, failing with a misleading 404. See npm/cli#9088.
 
       - run: npm install -g npm@latest # trusted publishing needs npm >=11.5.1
+      - run: npm --version
 
       - run: npm ci
 
