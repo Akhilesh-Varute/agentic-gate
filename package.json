@@ -1,6 +1,6 @@
 {
   "name": "agentic-gate",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Deterministic schema validation gates and circuit breakers for LLM function calling",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -22,6 +22,14 @@
   ],
   "author": "Akhilesh Varute",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Akhilesh-Varute/agentic-gate.git"
+  },
+  "homepage": "https://github.com/Akhilesh-Varute/agentic-gate#readme",
+  "bugs": {
+    "url": "https://github.com/Akhilesh-Varute/agentic-gate/issues"
+  },
   "peerDependencies": {
     "zod": "^3.0.0"
   },
