@@ -1,5 +1,5 @@
 import { BedrockRuntimeClient, ConverseCommand } from "@aws-sdk/client-bedrock-runtime";
-import { AgenticGate } from "./dist/index.js";
+import { AgenticGate } from "../dist/index.js"; // use "agentic-gate" instead when installed via npm
 import { z } from "zod";
 
 // 1. Initialize AWS Bedrock Client

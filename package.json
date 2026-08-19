@@ -7,7 +7,7 @@
   "type": "module",
   "scripts": {
     "build": "tsc",
-    "demo": "npm run build && node engine.mjs",
+    "demo": "npm run build && node examples/bedrock-converse.mjs",
     "prepublishOnly": "npm run build"
   },
   "keywords": [

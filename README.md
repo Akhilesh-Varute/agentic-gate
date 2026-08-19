@@ -2,6 +2,8 @@
 
 > **A production-ready, model-agnostic proxy engine that enforces strict runtime execution bounds, schema validation gates, and self-correction loops for LLM Function Calling.**
 
+[![npm version](https://img.shields.io/npm/v/agentic-gate.svg)](https://www.npmjs.com/package/agentic-gate)
+[![npm downloads](https://img.shields.io/npm/dm/agentic-gate.svg)](https://www.npmjs.com/package/agentic-gate)
 [![Node.js](https://img.shields.io/badge/Node.js-v18%2B-green.svg)](https://nodejs.org/)
 [![AWS Bedrock](https://img.shields.io/badge/AWS%20Bedrock-Converse%20API-orange.svg)](https://aws.amazon.com/bedrock/)
 [![Zod](https://img.shields.io/badge/Zod-Schema%20Validation-blue.svg)](https://zod.dev/)
@@ -57,13 +59,23 @@ This repository implements a **Deterministic State Engine** sitting between the 
         └─────────────────────────┘         └─────────────────────────┘
 ```
 
+```mermaid
+flowchart TD
+    A[LLM Provider<br/>Bedrock / OpenAI / Anthropic / Gemini] -->|Tool Use Requested| B[Interceptor Gate]
+    B --> C{Zod Schema<br/>Validation}
+    C -->|PASSED| D[Execute Downstream Tool<br/>AWS API / DB / Payment Gateway]
+    C -->|FAILED| E[Inject Error Feedback<br/>into Message History]
+    E -->|Retry within maxRetries| A
+    D --> F[Return Result to Caller]
+```
+
 ---
 
 ## Key Features
 
 * 🛡️ **Zero-Trust Validation Gate:** Uses Zod schemas to intercept and validate parameters locally *before* hitting downstream APIs.
 * 🔄 **Self-Correction Feedback Loop:** Feeds exact schema validation error traces back into the conversation history, allowing the LLM to self-correct in subsequent attempts.
-* ⚡ **Circuit Breaker Pattern:** Configurable `maxRetries` (default: `3`) prevents runaway token loops and API rate-limiting.
+* ⚡ **Bounded Retry Loops:** Wrap `interceptAndExecute` in a `maxRetries`-bounded loop (see examples) to stop runaway token loops and API rate-limiting.
 * 🔌 **Provider-Agnostic Design:** Decoupled architecture support for **AWS Bedrock**, **OpenAI**, **Anthropic**, and **Google Gemini**.
 * 🔑 **Zero Secrets Leakage:** Native integration with local AWS credentials (`aws configure`) or environment variables.
 
@@ -140,28 +152,58 @@ const validation = EC2RestartSchema.safeParse(toolCall.input);
 
 ## 🚀 Quick Start
 
-### 1. Prerequisites
-* Node.js v18+
-* AWS CLI configured locally (`aws configure`) with access to AWS Bedrock Converse API.
-
-### 2. Installation
+### 1. Install
 ```bash
-git clone https://github.com/Akhilesh-Varute/bedrock-deterministic-engine.git
-cd bedrock-deterministic-engine
-npm install
+npm install agentic-gate zod
 ```
 
-### 3. Environment Setup (Optional)
-If not using default CLI profiles, create a `.env` file (ensure `.env` is in `.gitignore`):
-```env
-AWS_REGION=us-east-1
-BEDROCK_MODEL_ID=us.anthropic.claude-haiku-4-5-20251001-v1:0
+### 2. Register a tool and intercept a call
+This is the core API — provider-agnostic, no AWS/network calls required:
+
+```javascript
+import { AgenticGate } from "agentic-gate";
+import { z } from "zod";
+
+const gate = new AgenticGate();
+
+gate.registerTool({
+  name: "restart_ec2_instance",
+  schema: z.object({
+    instanceId: z.string().regex(/^i-[a-f0-9]{8,17}$/, "Invalid AWS EC2 Instance ID format"),
+    region: z.enum(["us-east-1", "us-west-2", "ap-south-1"]),
+  }),
+  execute: async ({ instanceId, region }) => {
+    // Your real downstream call (AWS SDK, DB, HTTP, etc.)
+    return { status: "success", instanceId, region };
+  },
+});
+
+// Feed it raw, untrusted arguments straight from the LLM's tool-call payload
+const result = await gate.interceptAndExecute("restart_ec2_instance", {
+  instanceId: "i-0123456789abcdef0",
+  region: "eu-central-1", // not in the enum -> gate rejects before execute() runs
+});
+
+if (!result.success) {
+  console.log(result.error);
+  // "[Validation Gate Failed]: region: Invalid enum value..."
+  // Feed this string back into the LLM's message history so it can self-correct.
+}
 ```
 
-### 4. Running the Engine
-```bash
-node engine.mjs
-```
+### 3. See it wired into a real provider loop
+The snippet above validates a single call. For the full retry loop — sending the
+validation error back to the model and looping until it self-corrects or hits
+`maxRetries` — see the runnable examples in [`examples/`](./examples):
+
+| Example | Provider |
+|---|---|
+| [`examples/bedrock-converse.mjs`](./examples/bedrock-converse.mjs) | AWS Bedrock Converse API |
+| [`examples/openai.mjs`](./examples/openai.mjs) | OpenAI Function Calling |
+| [`examples/anthropic.mjs`](./examples/anthropic.mjs) | Anthropic Messages API |
+
+Each example requires only its provider's SDK and credentials — see
+[`examples/README.md`](./examples/README.md) for setup.
 
 ---
 
