@@ -75,7 +75,8 @@ flowchart TD
 
 * 🛡️ **Zero-Trust Validation Gate:** Uses Zod schemas to intercept and validate parameters locally *before* hitting downstream APIs.
 * 🔄 **Self-Correction Feedback Loop:** Feeds exact schema validation error traces back into the conversation history, allowing the LLM to self-correct in subsequent attempts.
-* ⚡ **Bounded Retry Loops:** Wrap `interceptAndExecute` in a `maxRetries`-bounded loop (see examples) to stop runaway token loops and API rate-limiting.
+* ⚡ **Circuit Breaker:** After `maxConsecutiveFailures` (default `3`) failures in a row for the same tool, the gate trips and rejects further calls *before* touching the schema or `execute()` — stopping runaway LLM retry loops without your own bookkeeping. Reset with `gate.resetCircuit(toolName)`.
+* 📡 **Telemetry Hooks:** `onGateSuccess` / `onGateFailure` callbacks fire on every call, so you can export metrics to OpenTelemetry, Datadog, CloudWatch, or plain logs.
 * 🔌 **Provider-Agnostic Design:** Decoupled architecture support for **AWS Bedrock**, **OpenAI**, **Anthropic**, and **Google Gemini**.
 * 🔑 **Zero Secrets Leakage:** Native integration with local AWS credentials (`aws configure`) or environment variables.
 
@@ -191,7 +192,23 @@ if (!result.success) {
 }
 ```
 
-### 3. See it wired into a real provider loop
+### 3. Circuit breaker + telemetry
+Configure both when constructing the gate:
+
+```javascript
+const gate = new AgenticGate({
+  maxConsecutiveFailures: 3, // 0 disables the breaker
+  onGateFailure: (e) => metrics.increment(`gate.failure.${e.reason}`, { tool: e.toolName }),
+  onGateSuccess: (e) => metrics.increment("gate.success", { tool: e.toolName }),
+});
+
+// After 3 consecutive failures for "restart_ec2_instance", the gate short-circuits:
+// { success: false, error: "[Circuit Breaker OPEN]: Tool 'restart_ec2_instance' has failed 3 consecutive times..." }
+
+gate.resetCircuit("restart_ec2_instance"); // once the underlying issue is fixed
+```
+
+### 4. See it wired into a real provider loop
 The snippet above validates a single call. For the full retry loop — sending the
 validation error back to the model and looping until it self-corrects or hits
 `maxRetries` — see the runnable examples in [`examples/`](./examples):
