@@ -22,45 +22,57 @@ and change the import to:
 import { AgenticGate } from "agentic-gate";
 ```
 
-## Bedrock — `bedrock-converse.mjs`
-
-```bash
-npm run build
-aws configure          # or set AWS_REGION / credentials via env
-node examples/bedrock-converse.mjs
-```
-
-Requires an AWS account with Bedrock model access enabled for the model in
-`MODEL_ID`.
+**`agentic-gate` itself only depends on `zod`.** The AWS/OpenAI/Anthropic SDKs
+below are only needed if you're running *these example scripts* — in a real
+app you bring whichever provider client you already use, and none of them
+require any CLI tool to be installed. The CLIs mentioned below are just the
+most convenient way to set up credentials, not a runtime requirement.
 
 ## OpenAI — `openai.mjs`
+
+No CLI needed. The SDK reads the key from an env var, or you can pass it
+directly in code (`new OpenAI({ apiKey: "sk-..." })`).
 
 ```bash
 npm install openai
 npm run build
-export OPENAI_API_KEY=sk-...
+export OPENAI_API_KEY=sk-...      # PowerShell: $env:OPENAI_API_KEY = "sk-..."
 node examples/openai.mjs
 ```
 
 ## Anthropic — `anthropic.mjs`
 
+Same story — no CLI needed.
+
 ```bash
 npm install @anthropic-ai/sdk
 npm run build
-export ANTHROPIC_API_KEY=sk-ant-...
+export ANTHROPIC_API_KEY=sk-ant-...   # PowerShell: $env:ANTHROPIC_API_KEY = "sk-ant-..."
 node examples/anthropic.mjs
 ```
 
-## Pizza order — `pizza-order.mjs`
+## Bedrock — `bedrock-converse.mjs` and `pizza-order.mjs`
+
+The AWS CLI is **not** required. `aws configure` is just one convenient way to
+write `~/.aws/credentials` — the SDK's credential provider chain accepts any
+of these, with zero CLI install:
+
+* Env vars: `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` (/ `AWS_SESSION_TOKEN`)
+* Passed directly in code: `new BedrockRuntimeClient({ region, credentials: { accessKeyId, secretAccessKey } })`
+* A manually-written `~/.aws/credentials` file
+* An IAM role, if running on EC2/Lambda/ECS — no explicit credentials at all
 
 ```bash
 npm run build
-aws configure          # or set AWS_REGION / credentials via env
+# any of the credential options above, then:
+node examples/bedrock-converse.mjs
 node examples/pizza-order.mjs
 ```
 
-Also enables the circuit breaker's `onGateSuccess`/`onGateFailure` telemetry
-hooks so you can see them fire in the console alongside each attempt.
+Requires an AWS account with Bedrock model access enabled for the model in
+`MODEL_ID`. `pizza-order.mjs` additionally enables the circuit breaker's
+`onGateSuccess`/`onGateFailure` telemetry hooks so you can see them fire in
+the console alongside each attempt.
 
 ## What to look for
 
