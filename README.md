@@ -213,11 +213,12 @@ The snippet above validates a single call. For the full retry loop — sending t
 validation error back to the model and looping until it self-corrects or hits
 `maxRetries` — see the runnable examples in [`examples/`](./examples):
 
-| Example | Provider |
-|---|---|
-| [`examples/bedrock-converse.mjs`](./examples/bedrock-converse.mjs) | AWS Bedrock Converse API |
-| [`examples/openai.mjs`](./examples/openai.mjs) | OpenAI Function Calling |
-| [`examples/anthropic.mjs`](./examples/anthropic.mjs) | Anthropic Messages API |
+| Example | Provider | Domain |
+|---|---|---|
+| [`examples/bedrock-converse.mjs`](./examples/bedrock-converse.mjs) | AWS Bedrock Converse API | EC2 instance restart |
+| [`examples/openai.mjs`](./examples/openai.mjs) | OpenAI Function Calling | EC2 instance restart |
+| [`examples/anthropic.mjs`](./examples/anthropic.mjs) | Anthropic Messages API | EC2 instance restart |
+| [`examples/pizza-order.mjs`](./examples/pizza-order.mjs) | AWS Bedrock Converse API | Pizza ordering (non-infra, to show the gate isn't AWS-specific) |
 
 Each example requires only its provider's SDK and credentials — see
 [`examples/README.md`](./examples/README.md) for setup.
