@@ -1,0 +1,35 @@
+name: Publish to PyPI
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    # Only fires for Python releases, tagged python-vX.Y.Z — the JS package
+    # (tagged vX.Y.Z) is handled by publish.yml.
+    if: ${{ startsWith(github.event.release.tag_name, 'python-v') }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: python
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: pip install build pytest pytest-asyncio -e .
+
+      - run: pytest
+
+      - run: python -m build
+
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: python/dist

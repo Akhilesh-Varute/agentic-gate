@@ -10,6 +10,9 @@ permissions:
 
 jobs:
   publish:
+    # Python releases are tagged python-vX.Y.Z and handled by publish-python.yml —
+    # skip so a Python release doesn't also try (and fail) to npm publish.
+    if: ${{ !startsWith(github.event.release.tag_name, 'python-v') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
