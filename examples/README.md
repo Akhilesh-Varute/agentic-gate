@@ -17,6 +17,13 @@ directly inside a LangChain `tool()` handler and lets LangChain's own
 `tool.invoke(toolCall)` round-trip the result — the pattern you'd use if your
 agent is built with LangChain/LangGraph.
 
+Every raw provider example (`bedrock-converse.mjs`, `openai.mjs`,
+`anthropic.mjs`, `gemini.mjs`) has an `-adapter` twin
+(`bedrock-converse-adapter.mjs`, `openai-adapter.mjs`, etc.) running the
+identical scenario through `agentic-gate/adapters/*` instead of manually
+parsing the response — compare a file to its `-adapter` twin to see the loop
+shrink from ~30 lines to ~10.
+
 All examples import from `../dist/index.js` (the local build). If you're
 using this outside of this repo, install the package instead:
 
@@ -48,16 +55,13 @@ export OPENAI_API_KEY=sk-...      # PowerShell: $env:OPENAI_API_KEY = "sk-..."
 node examples/openai.mjs
 ```
 
-`examples/openai-adapter.mjs` runs the identical scenario but uses
-`agentic-gate/adapters/openai`'s `handleResponse()` instead of manually
-parsing `tool_calls` and rebuilding `role: "tool"` messages by hand — compare
-the two files to see the loop shrink from ~30 lines to ~10. Same setup:
+Same setup runs `openai-adapter.mjs`:
 
 ```bash
 node examples/openai-adapter.mjs
 ```
 
-## Anthropic — `anthropic.mjs`
+## Anthropic — `anthropic.mjs` / `anthropic-adapter.mjs`
 
 Same story — no CLI needed.
 
@@ -66,9 +70,10 @@ npm install @anthropic-ai/sdk
 npm run build
 export ANTHROPIC_API_KEY=sk-ant-...   # PowerShell: $env:ANTHROPIC_API_KEY = "sk-ant-..."
 node examples/anthropic.mjs
+node examples/anthropic-adapter.mjs
 ```
 
-## Gemini — `gemini.mjs`
+## Gemini — `gemini.mjs` / `gemini-adapter.mjs`
 
 No CLI needed. Get a key from [Google AI Studio](https://aistudio.google.com/apikey).
 
@@ -77,12 +82,15 @@ npm install @google/genai
 npm run build
 export GEMINI_API_KEY=...      # PowerShell: $env:GEMINI_API_KEY = "..."
 node examples/gemini.mjs
+node examples/gemini-adapter.mjs
 ```
 
 Note: Gemini 3.x models attach a `thoughtSignature` to `functionCall` response
 parts. When replaying the model's turn back into `contents` for the next
 request, push `response.candidates[0].content` verbatim rather than
 reconstructing the part yourself — dropping the signature causes a 400.
+`gemini-adapter.mjs` and `agentic-gate/adapters/gemini` already do this
+correctly, so you don't have to remember it.
 
 ## LangChain — `langchain.mjs`
 
@@ -98,7 +106,7 @@ export GEMINI_API_KEY=...      # PowerShell: $env:GEMINI_API_KEY = "..."
 node examples/langchain.mjs
 ```
 
-## Bedrock — `bedrock-converse.mjs` and `pizza-order.mjs`
+## Bedrock — `bedrock-converse.mjs` / `bedrock-converse-adapter.mjs` / `pizza-order.mjs`
 
 The AWS CLI is **not** required. `aws configure` is just one convenient way to
 write `~/.aws/credentials` — the SDK's credential provider chain accepts any
@@ -113,6 +121,7 @@ of these, with zero CLI install:
 npm run build
 # any of the credential options above, then:
 node examples/bedrock-converse.mjs
+node examples/bedrock-converse-adapter.mjs
 node examples/pizza-order.mjs
 ```
 

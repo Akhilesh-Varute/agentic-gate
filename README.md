@@ -257,18 +257,19 @@ gate.registerTool({
 
 ### 5. Less boilerplate with an adapter
 Every provider example above ends up writing the same ~30 lines: pull the
-tool call out of the response, `JSON.parse` its arguments, run the gate, and
-rebuild a provider-shaped result message. `agentic-gate/adapters/openai`
-does that for you:
+tool call(s) out of the response, parse the arguments, run the gate, and
+rebuild a provider-shaped result message. `agentic-gate/adapters/*` does that
+for you — one adapter per provider, since each has its own response and
+message shape:
 
 ```javascript
 import { AgenticGate } from "agentic-gate";
-import { handleResponse } from "agentic-gate/adapters/openai";
+import { handleResponse } from "agentic-gate/adapters/openai"; // or /anthropic, /bedrock, /gemini
 
 for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
   const response = await openai.chat.completions.create({ model, messages, tools });
   const outcome = await handleResponse(gate, response);
-  messages.push(...outcome.messages); // assistant message + one "tool" message per call
+  messages.push(...outcome.messages); // ready-to-append message(s), gate already applied
 
   if (outcome.done) {
     console.log(outcome.text);
@@ -277,24 +278,25 @@ for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
 }
 ```
 
-It only depends on the shape of the response object — not the `openai`
-package itself — so it doesn't add a dependency. Currently ships for OpenAI;
-Anthropic/Bedrock/Gemini adapters are on the roadmap (see
-[`examples/openai-adapter.mjs`](./examples/openai-adapter.mjs) vs.
-[`examples/openai.mjs`](./examples/openai.mjs) for the full before/after).
+Each adapter only depends on the shape of its provider's response object —
+not the provider's SDK — so none of them add a dependency. All four handle
+multiple simultaneous tool calls in one response correctly (Anthropic/Bedrock
+bundle every result into a single following turn, as required).
 
 ### 6. See it wired into a real provider loop
 The snippet above validates a single call. For the full retry loop — sending the
 validation error back to the model and looping until it self-corrects or hits
-`maxRetries` — see the runnable examples in [`examples/`](./examples):
+`maxRetries` — see the runnable examples in [`examples/`](./examples). Each
+provider has both a raw version (manual parsing, to see the mechanics) and an
+`-adapter` version (using `agentic-gate/adapters/*`, to see the boilerplate
+disappear):
 
 | Example | Provider | Domain |
 |---|---|---|
-| [`examples/bedrock-converse.mjs`](./examples/bedrock-converse.mjs) | AWS Bedrock Converse API | EC2 instance restart |
-| [`examples/openai.mjs`](./examples/openai.mjs) | OpenAI Function Calling | EC2 instance restart |
-| [`examples/openai-adapter.mjs`](./examples/openai-adapter.mjs) | OpenAI Function Calling | Same scenario, using `agentic-gate/adapters/openai` to cut the loop from ~30 lines to ~10 |
-| [`examples/anthropic.mjs`](./examples/anthropic.mjs) | Anthropic Messages API | EC2 instance restart |
-| [`examples/gemini.mjs`](./examples/gemini.mjs) | Google Gemini API | Satellite launch scheduling (non-infra) |
+| [`examples/bedrock-converse.mjs`](./examples/bedrock-converse.mjs) / [`-adapter`](./examples/bedrock-converse-adapter.mjs) | AWS Bedrock Converse API | EC2 instance restart |
+| [`examples/openai.mjs`](./examples/openai.mjs) / [`-adapter`](./examples/openai-adapter.mjs) | OpenAI Function Calling | EC2 instance restart |
+| [`examples/anthropic.mjs`](./examples/anthropic.mjs) / [`-adapter`](./examples/anthropic-adapter.mjs) | Anthropic Messages API | EC2 instance restart |
+| [`examples/gemini.mjs`](./examples/gemini.mjs) / [`-adapter`](./examples/gemini-adapter.mjs) | Google Gemini API | Satellite launch scheduling (non-infra) |
 | [`examples/pizza-order.mjs`](./examples/pizza-order.mjs) | AWS Bedrock Converse API | Pizza ordering (non-infra, to show the gate isn't AWS-specific) |
 | [`examples/langchain.mjs`](./examples/langchain.mjs) | LangChain (`@langchain/google-genai`) | Pet adoption — gate wrapped inside a LangChain `tool()` handler |
 
