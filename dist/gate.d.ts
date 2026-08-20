@@ -17,8 +17,9 @@ export declare class AgenticGate {
      */
     resetCircuit(toolName: string): void;
     /**
-     * Intercepts raw tool arguments from an LLM, validates them against the registered Zod schema,
-     * and executes the downstream tool only if validation succeeds.
+     * Intercepts raw tool arguments from an LLM, validates them against the registered Zod schema
+     * (and the tool's optional async validate() check), and executes the downstream tool only if
+     * both succeed.
      */
     interceptAndExecute(toolName: string, rawArguments: unknown): Promise<GateResult>;
     private isCircuitOpen;

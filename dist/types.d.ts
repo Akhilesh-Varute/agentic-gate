@@ -2,6 +2,14 @@ import { z } from "zod";
 export interface ToolDefinition<T extends z.ZodTypeAny = z.ZodTypeAny> {
     name: string;
     schema: T;
+    /**
+     * Optional async check against real external state, run after the schema
+     * passes but before execute() — e.g. confirming an EC2 instance ID actually
+     * exists via the AWS SDK before allowing the action to proceed. Throw an
+     * Error (with a message safe to feed back to the LLM) to reject the call;
+     * resolving normally allows execute() to run.
+     */
+    validate?: (args: z.infer<T>) => Promise<void>;
     execute: (args: z.infer<T>) => Promise<unknown>;
 }
 export interface GateResult<T = unknown> {
@@ -9,7 +17,7 @@ export interface GateResult<T = unknown> {
     data?: T;
     error?: string;
 }
-export type GateFailureReason = "unregistered" | "validation" | "execution" | "circuit-open";
+export type GateFailureReason = "unregistered" | "validation" | "async-validation" | "execution" | "circuit-open";
 export interface GateSuccessEvent<T = unknown> {
     toolName: string;
     args: unknown;

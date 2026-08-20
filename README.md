@@ -77,6 +77,7 @@ flowchart TD
 * 🔄 **Self-Correction Feedback Loop:** Feeds exact schema validation error traces back into the conversation history, allowing the LLM to self-correct in subsequent attempts.
 * ⚡ **Circuit Breaker:** After `maxConsecutiveFailures` (default `3`) failures in a row for the same tool, the gate trips and rejects further calls *before* touching the schema or `execute()` — stopping runaway LLM retry loops without your own bookkeeping. Reset with `gate.resetCircuit(toolName)`.
 * 📡 **Telemetry Hooks:** `onGateSuccess` / `onGateFailure` callbacks fire on every call, so you can export metrics to OpenTelemetry, Datadog, CloudWatch, or plain logs.
+* 🔍 **Async External-State Validation:** Add an optional `validate()` hook per tool to check real external state (e.g. does this EC2 instance ID actually exist) before `execute()` runs — a rejected `validate()` counts as a gate failure just like a schema mismatch.
 * 🔌 **Provider-Agnostic Design:** Decoupled architecture support for **AWS Bedrock**, **OpenAI**, **Anthropic**, and **Google Gemini**.
 * 🔑 **Zero Secrets Leakage:** Native integration with local AWS credentials (`aws configure`) or environment variables.
 
@@ -223,7 +224,38 @@ const gate = new AgenticGate({
 gate.resetCircuit("restart_ec2_instance"); // once the underlying issue is fixed
 ```
 
-### 4. See it wired into a real provider loop
+### 4. Async external-state validation
+Zod only checks the *shape* of the arguments — it can't tell you whether
+`i-0123456789abcdef0` is an EC2 instance that actually exists. For that, add
+a `validate()` hook: it runs after the schema passes and before `execute()`,
+and throwing rejects the call exactly like a schema failure (same circuit
+breaker, same telemetry, reason `"async-validation"`):
+
+```javascript
+import { EC2Client, DescribeInstancesCommand } from "@aws-sdk/client-ec2";
+const ec2 = new EC2Client({});
+
+gate.registerTool({
+  name: "restart_ec2_instance",
+  schema: z.object({
+    instanceId: z.string().regex(/^i-[a-f0-9]{8,17}$/),
+    region: z.enum(["us-east-1", "us-west-2", "ap-south-1"]),
+  }),
+  validate: async ({ instanceId, region }) => {
+    const { Reservations } = await ec2.send(
+      new DescribeInstancesCommand({ InstanceIds: [instanceId] }, { region })
+    );
+    if (!Reservations?.length) {
+      throw new Error(`Instance '${instanceId}' does not exist in ${region}`);
+    }
+  },
+  execute: async ({ instanceId, region }) => {
+    // Safe to restart — we already confirmed the instance is real.
+  },
+});
+```
+
+### 5. See it wired into a real provider loop
 The snippet above validates a single call. For the full retry loop — sending the
 validation error back to the model and looping until it self-corrects or hits
 `maxRetries` — see the runnable examples in [`examples/`](./examples):

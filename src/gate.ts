@@ -32,8 +32,9 @@ export class AgenticGate {
   }
 
   /**
-   * Intercepts raw tool arguments from an LLM, validates them against the registered Zod schema,
-   * and executes the downstream tool only if validation succeeds.
+   * Intercepts raw tool arguments from an LLM, validates them against the registered Zod schema
+   * (and the tool's optional async validate() check), and executes the downstream tool only if
+   * both succeed.
    */
   async interceptAndExecute(toolName: string, rawArguments: unknown): Promise<GateResult> {
     const tool = this.tools.get(toolName);
@@ -65,7 +66,16 @@ export class AgenticGate {
       return this.fail(toolName, rawArguments, "validation", `[Validation Gate Failed]: ${formattedError}`);
     }
 
-    // Step 2: Safe Downstream Execution
+    // Step 2: Async External-State Validation (e.g. does this resource actually exist?)
+    if (tool.validate) {
+      try {
+        await tool.validate(parseResult.data);
+      } catch (err: any) {
+        return this.fail(toolName, rawArguments, "async-validation", `[Async Validation Failed]: ${err.message || String(err)}`);
+      }
+    }
+
+    // Step 3: Safe Downstream Execution
     try {
       const output = await tool.execute(parseResult.data);
       this.consecutiveFailures.delete(toolName);

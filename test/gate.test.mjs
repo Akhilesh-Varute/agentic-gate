@@ -37,6 +37,71 @@ test("rejects invalid input before execute() runs", async () => {
   assert.equal(executed, false);
 });
 
+test("validate() runs after schema validation and before execute()", async () => {
+  const gate = makeGate();
+  const calls = [];
+  gate.registerTool({
+    name: "restart_instance",
+    schema: z.object({ instanceId: z.string() }),
+    validate: async ({ instanceId }) => {
+      calls.push("validate");
+      if (instanceId !== "i-real") throw new Error(`instance '${instanceId}' does not exist`);
+    },
+    execute: async ({ instanceId }) => {
+      calls.push("execute");
+      return { restarted: instanceId };
+    },
+  });
+
+  const result = await gate.interceptAndExecute("restart_instance", { instanceId: "i-real" });
+  assert.deepEqual(result, { success: true, data: { restarted: "i-real" } });
+  assert.deepEqual(calls, ["validate", "execute"]);
+});
+
+test("validate() throwing rejects the call before execute() runs", async () => {
+  const gate = makeGate();
+  let executed = false;
+  gate.registerTool({
+    name: "restart_instance",
+    schema: z.object({ instanceId: z.string() }),
+    validate: async ({ instanceId }) => {
+      if (instanceId !== "i-real") throw new Error(`instance '${instanceId}' does not exist`);
+    },
+    execute: async ({ instanceId }) => {
+      executed = true;
+      return { restarted: instanceId };
+    },
+  });
+
+  const result = await gate.interceptAndExecute("restart_instance", { instanceId: "i-fake" });
+  assert.equal(result.success, false);
+  assert.match(result.error, /Async Validation Failed.*does not exist/);
+  assert.equal(executed, false);
+});
+
+test("a failing validate() counts toward the circuit breaker and fires onGateFailure with reason async-validation", async () => {
+  const events = [];
+  const gate = makeGate({
+    maxConsecutiveFailures: 1,
+    onGateFailure: (e) => events.push(e),
+  });
+  gate.registerTool({
+    name: "restart_instance",
+    schema: z.object({ instanceId: z.string() }),
+    validate: async () => {
+      throw new Error("instance does not exist");
+    },
+    execute: async ({ instanceId }) => ({ restarted: instanceId }),
+  });
+
+  await gate.interceptAndExecute("restart_instance", { instanceId: "i-fake" });
+  const tripped = await gate.interceptAndExecute("restart_instance", { instanceId: "i-fake" });
+
+  assert.equal(events[0].reason, "async-validation");
+  assert.equal(events[0].consecutiveFailures, 1);
+  assert.match(tripped.error, /Circuit Breaker OPEN/);
+});
+
 test("returns an error for an unregistered tool", async () => {
   const gate = makeGate();
   const result = await gate.interceptAndExecute("nope", {});
