@@ -1,13 +1,14 @@
 # Examples
 
-`bedrock-converse.mjs`, `openai.mjs`, `anthropic.mjs`, and `gemini.mjs` all run
-the same scenario — asking an LLM to restart an EC2 instance in an unsupported
-region — through `AgenticGate`, so you can compare how the validation-gate +
+`bedrock-converse.mjs`, `openai.mjs`, and `anthropic.mjs` all run the same
+scenario — asking an LLM to restart an EC2 instance in an unsupported region —
+through `AgenticGate`, so you can compare how the validation-gate +
 self-correction loop looks across providers.
 
-`pizza-order.mjs` runs a completely unrelated, non-infra domain (ordering
-pizza, with quantity/size/topping limits) to show the gate validates whatever
-Zod schema you give it — it has no AWS- or infra-specific behavior baked in.
+`pizza-order.mjs` and `gemini.mjs` run completely unrelated, non-infra domains
+(ordering pizza, scheduling a satellite launch) with their own quantity/enum/
+length limits, to show the gate validates whatever Zod schema you give it —
+it has no AWS- or infra-specific behavior baked in.
 
 All examples import from `../dist/index.js` (the local build). If you're
 using this outside of this repo, install the package instead:
@@ -94,8 +95,8 @@ the console alongside each attempt.
 
 In the EC2 examples, the model is asked to restart an instance in
 `eu-central-1`, which isn't in the tool's allowed `region` enum. In the pizza
-example, it's asked for an oversized, out-of-enum order. Watch the console
-output in either case:
+and satellite examples, it's asked for an oversized, out-of-enum order/launch.
+Watch the console output in either case:
 
 1. The model calls the tool with invalid arguments.
 2. `gate.interceptAndExecute()` rejects it locally — no downstream call happens.

@@ -10,36 +10,39 @@ const MODEL_ID = "gemini-3.6-flash";
 const gate = new AgenticGate();
 
 gate.registerTool({
-  name: "restart_ec2_instance",
+  name: "launch_satellite",
   schema: z.object({
-    instanceId: z.string().regex(/^i-[a-f0-9]{8,17}$/, "Invalid AWS EC2 Instance ID format"),
-    region: z.enum(["us-east-1", "us-west-2", "ap-south-1"], {
-      errorMap: () => ({ message: "Region must be one of: us-east-1, us-west-2, ap-south-1" })
-    })
+    name: z.string().max(30, "satellite name cannot exceed 30 characters"),
+    orbit: z.enum(["LEO", "MEO", "GEO"], {
+      errorMap: () => ({ message: "orbit must be one of: LEO, MEO, GEO" })
+    }),
+    payloadKg: z.number().positive().max(500, "payload cannot exceed 500kg for this launch vehicle")
   }),
-  execute: async ({ instanceId, region }) => {
-    console.log(`⚡ [Safe Execution]: Calling AWS EC2 SDK to restart ${instanceId} in ${region}...`);
-    return { status: "success", instanceId, region, action: "reboot_initiated" };
+  execute: async ({ name, orbit, payloadKg }) => {
+    console.log(`🚀 [Launch Control]: Igniting boosters for "${name}" -> ${orbit} orbit with a ${payloadKg}kg payload...`);
+    return { status: "launched", missionId: "MSN-" + Math.floor(Math.random() * 100000), name, orbit, payloadKg };
   }
 });
 
 // 3. Define the Gemini function declaration matching the Zod schema
-const restartEc2Declaration = {
-  name: "restart_ec2_instance",
-  description: "Restarts a specific AWS EC2 instance in a supported region.",
+const launchSatelliteDeclaration = {
+  name: "launch_satellite",
+  description: "Schedules a satellite launch into a given orbit.",
   parametersJsonSchema: {
     type: "object",
     properties: {
-      instanceId: { type: "string", description: "The EC2 instance ID (e.g., i-0123456789abcdef0)" },
-      region: { type: "string", description: "The target AWS region" }
+      name: { type: "string", description: "Satellite name" },
+      orbit: { type: "string", description: "Target orbit" },
+      payloadKg: { type: "number", description: "Payload mass in kilograms" }
     },
-    required: ["instanceId", "region"]
+    required: ["name", "orbit", "payloadKg"]
   }
 };
 
 // 4. Main Deterministic Execution Loop
 async function runEngine() {
-  const prompt = "Please restart instance i-0123456789abcdef0 in Frankfurt (eu-central-1)";
+  const prompt =
+    "Launch a satellite named 'Ultra Deep Space Explorer XL-9000 Mark II' into a deep interstellar orbit, carrying a 5000kg payload.";
   console.log(`\n🚀 Starting Engine Execution for Prompt: "${prompt}"`);
   console.log(`📡 Using Gemini Model: ${MODEL_ID}\n`);
 
@@ -55,7 +58,7 @@ async function runEngine() {
       model: MODEL_ID,
       contents,
       config: {
-        tools: [{ functionDeclarations: [restartEc2Declaration] }]
+        tools: [{ functionDeclarations: [launchSatelliteDeclaration] }]
       }
     });
 
