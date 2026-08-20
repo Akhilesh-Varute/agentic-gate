@@ -90,6 +90,35 @@ gate.register_tool(
 )
 ```
 
+## Less boilerplate with an adapter
+
+Wiring the gate into a real provider loop means pulling the tool call out of
+the response, running the gate, and rebuilding a provider-shaped result
+message every time. `agentic_gate.adapters.*` does that for you — one per
+provider, since each has its own response shape:
+
+```python
+from agentic_gate.adapters.bedrock import handle_response
+# or .openai, .anthropic, .gemini
+
+for attempt in range(1, MAX_RETRIES + 1):
+    response = client.converse(modelId=MODEL_ID, messages=messages, toolConfig=tool_config)
+    outcome = await handle_response(gate, response)
+    messages.extend(outcome.messages)
+
+    if outcome.done:
+        print(outcome.text)
+        break
+```
+
+Each adapter works off the response object's shape (dict *or* the SDK's own
+Pydantic-style attribute access — both are supported) rather than importing
+the provider's SDK, so none of them add a dependency. Available for
+`bedrock`, `openai`, `anthropic`, and `gemini`; see
+[`examples/`](./examples) for a runnable script per provider (`bedrock_converse.py` and
+`gemini_example.py` are verified against real APIs; `openai_example.py` and
+`anthropic_example.py` follow the identical, SDK-verified pattern).
+
 ## API
 
 ### `AgenticGate(max_consecutive_failures=3, on_gate_success=None, on_gate_failure=None)`
