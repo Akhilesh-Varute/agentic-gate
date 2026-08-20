@@ -307,25 +307,61 @@ Each example requires only its provider's SDK and credentials — see
 
 ## 🧪 Real Execution Logs
 
-Here is the deterministic execution output when asking the LLM to restart an instance in an unsupported region (`eu-central-1`):
+Here is unedited output from [`examples/pizza-order.mjs`](./examples/pizza-order.mjs) — a
+domain with nothing to do with AWS, chosen to show the gate validates whatever
+Zod schema you give it. The prompt deliberately breaks three constraints at
+once (`size`, `quantity`, and `toppings`), and telemetry hooks are enabled so
+you can see them fire alongside each attempt:
 
 ```console
-🚀 Starting Engine Execution for Prompt: "Please restart instance i-0123456789abcdef0 in Frankfurt (eu-central-1)"
+🚀 Starting Engine Execution for Prompt: "I'm throwing a huge party — order me 50 party-size pizzas loaded with every topping you can think of: pepperoni, mushroom, onion, olives, extra-cheese, pineapple, and jalapenos."
 📡 Using Bedrock Model: us.anthropic.claude-haiku-4-5-20251001-v1:0
 
 --- Loop Attempt 1/3 ---
-[Bedrock Tool Requested]: "restart_ec2_instance" with input: { instanceId: 'i-0123456789abcdef0', region: 'eu-central-1' }
-❌ [Validation Gate FAILED]: Region must be one of: us-east-1, us-west-2, ap-south-1
-
+[Bedrock Tool Requested]: "order_pizza" with input: {
+  size: 'party',
+  quantity: 50,
+  toppings: [
+    'pepperoni',
+    'mushroom',
+    'onion',
+    'olives',
+    'extra-cheese',
+    'pineapple',
+    'jalapenos'
+  ]
+}
+   📉 telemetry: validation failure #1 for "order_pizza"
+❌ [Validation Gate Failed]: size: size must be one of: small, medium, large; quantity: quantity cannot exceed 10 pizzas per order; toppings: you can pick at most 5 toppings; toppings.5: Invalid enum value. Expected 'pepperoni' | 'mushroom' | 'onion' | 'olives' | 'extra-cheese', received 'pineapple'; toppings.6: Invalid enum value. Expected 'pepperoni' | 'mushroom' | 'onion' | 'olives' | 'extra-cheese', received 'jalapenos'
 --- Loop Attempt 2/3 ---
 
-🤖 [Model Feedback]: I apologize, but it appears that the restart function is currently only available for the following AWS regions:
-- us-east-1 (US East - N. Virginia)
-- us-west-2 (US West - Oregon)
-- ap-south-1 (Asia Pacific - Mumbai)
+🤖 [Model Response]:
+I see there are some limitations with the pizza ordering system:
 
-The Frankfurt region (eu-central-1) is not supported. To restart your instance in Frankfurt, you would need to use the AWS Console directly.
+1. **Size**: Only small, medium, or large sizes are available (not party-size)
+2. **Quantity**: Maximum of 10 pizzas per order
+3. **Toppings**: Maximum of 5 toppings, and only these are available:
+   - pepperoni
+   - mushroom
+   - onion
+   - olives
+   - extra-cheese
+
+Unfortunately, pineapple and jalapenos aren't available options.
+
+To help you with your party, here's what I can do:
+
+**Option 1**: I can place **5 separate orders of 10 large pizzas each** (50 pizzas total) with your choice of up to 5 of the available toppings.
+
+**Option 2**: Order a smaller quantity with the available toppings.
+
+Which would you prefer? And which 5 toppings would you like me to use from: pepperoni, mushroom, onion, olives, or extra-cheese?
 ```
+
+Note the gate rejected the call — hallucinated size, over-limit quantity, and
+two invalid toppings, five violations across three fields — in one pass,
+*before* any downstream code ran, and the model didn't just apologize: it
+proposed a working alternative on its own.
 
 ---
 
