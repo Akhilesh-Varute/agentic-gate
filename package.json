@@ -1,10 +1,21 @@
 {
   "name": "agentic-gate",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "Deterministic schema validation gates and circuit breakers for LLM function calling",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./adapters/openai": {
+      "types": "./dist/adapters/openai.d.ts",
+      "import": "./dist/adapters/openai.js"
+    },
+    "./package.json": "./package.json"
+  },
   "scripts": {
     "build": "tsc",
     "test": "npm run build && node --test",

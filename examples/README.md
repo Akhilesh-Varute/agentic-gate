@@ -48,6 +48,15 @@ export OPENAI_API_KEY=sk-...      # PowerShell: $env:OPENAI_API_KEY = "sk-..."
 node examples/openai.mjs
 ```
 
+`examples/openai-adapter.mjs` runs the identical scenario but uses
+`agentic-gate/adapters/openai`'s `handleResponse()` instead of manually
+parsing `tool_calls` and rebuilding `role: "tool"` messages by hand — compare
+the two files to see the loop shrink from ~30 lines to ~10. Same setup:
+
+```bash
+node examples/openai-adapter.mjs
+```
+
 ## Anthropic — `anthropic.mjs`
 
 Same story — no CLI needed.

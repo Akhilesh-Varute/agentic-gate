@@ -255,7 +255,35 @@ gate.registerTool({
 });
 ```
 
-### 5. See it wired into a real provider loop
+### 5. Less boilerplate with an adapter
+Every provider example above ends up writing the same ~30 lines: pull the
+tool call out of the response, `JSON.parse` its arguments, run the gate, and
+rebuild a provider-shaped result message. `agentic-gate/adapters/openai`
+does that for you:
+
+```javascript
+import { AgenticGate } from "agentic-gate";
+import { handleResponse } from "agentic-gate/adapters/openai";
+
+for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+  const response = await openai.chat.completions.create({ model, messages, tools });
+  const outcome = await handleResponse(gate, response);
+  messages.push(...outcome.messages); // assistant message + one "tool" message per call
+
+  if (outcome.done) {
+    console.log(outcome.text);
+    break;
+  }
+}
+```
+
+It only depends on the shape of the response object — not the `openai`
+package itself — so it doesn't add a dependency. Currently ships for OpenAI;
+Anthropic/Bedrock/Gemini adapters are on the roadmap (see
+[`examples/openai-adapter.mjs`](./examples/openai-adapter.mjs) vs.
+[`examples/openai.mjs`](./examples/openai.mjs) for the full before/after).
+
+### 6. See it wired into a real provider loop
 The snippet above validates a single call. For the full retry loop — sending the
 validation error back to the model and looping until it self-corrects or hits
 `maxRetries` — see the runnable examples in [`examples/`](./examples):
@@ -264,6 +292,7 @@ validation error back to the model and looping until it self-corrects or hits
 |---|---|---|
 | [`examples/bedrock-converse.mjs`](./examples/bedrock-converse.mjs) | AWS Bedrock Converse API | EC2 instance restart |
 | [`examples/openai.mjs`](./examples/openai.mjs) | OpenAI Function Calling | EC2 instance restart |
+| [`examples/openai-adapter.mjs`](./examples/openai-adapter.mjs) | OpenAI Function Calling | Same scenario, using `agentic-gate/adapters/openai` to cut the loop from ~30 lines to ~10 |
 | [`examples/anthropic.mjs`](./examples/anthropic.mjs) | Anthropic Messages API | EC2 instance restart |
 | [`examples/gemini.mjs`](./examples/gemini.mjs) | Google Gemini API | Satellite launch scheduling (non-infra) |
 | [`examples/pizza-order.mjs`](./examples/pizza-order.mjs) | AWS Bedrock Converse API | Pizza ordering (non-infra, to show the gate isn't AWS-specific) |
