@@ -115,9 +115,36 @@ Each adapter works off the response object's shape (dict *or* the SDK's own
 Pydantic-style attribute access — both are supported) rather than importing
 the provider's SDK, so none of them add a dependency. Available for
 `bedrock`, `openai`, `anthropic`, and `gemini`; see
-[`examples/`](./examples) for a runnable script per provider (`bedrock_converse.py` and
-`gemini_example.py` are verified against real APIs; `openai_example.py` and
-`anthropic_example.py` follow the identical, SDK-verified pattern).
+[`examples/`](./examples) for a runnable script per provider (`bedrock_converse.py`,
+`gemini_example.py`, and `ollama_test.py` are verified against real APIs;
+`openai_example.py` and `anthropic_example.py` follow the identical,
+SDK-verified pattern).
+
+## Local models (Ollama, vLLM, LM Studio, ...)
+
+The `openai` adapter doesn't import the `openai` package — it just reads the
+response object's shape — so it works against anything exposing an
+OpenAI-compatible `/v1/chat/completions` endpoint. Point the official
+`openai` client's `base_url` at your local server and use the adapter
+exactly as shown above:
+
+```python
+from openai import OpenAI
+from agentic_gate.adapters.openai import handle_response
+
+client = OpenAI(base_url="http://localhost:11434/v1", api_key="ollama")  # Ollama
+response = client.chat.completions.create(model="qwen2.5:0.5b", messages=messages, tools=tools)
+outcome = await handle_response(gate, response)
+```
+
+Verified live against a Docker-hosted Ollama running `qwen2.5:0.5b` (397MB)
+— confirmed `tool_call.id` comes through populated (Ollama had a documented
+gap here historically, [ollama/ollama#6462](https://github.com/ollama/ollama/issues/6462),
+resolved on current versions) and the full validation round-trip works
+correctly. Should work the same against vLLM/LM Studio's OpenAI-compatible
+endpoints, though only Ollama has been tested directly. See
+[`examples/ollama_test.py`](./examples/ollama_test.py) and
+[`examples/README.md`](./examples/README.md) for the full runnable setup.
 
 ## API
 
