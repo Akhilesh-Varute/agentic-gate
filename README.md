@@ -323,7 +323,11 @@ for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
 Each adapter only depends on the shape of its provider's response object —
 not the provider's SDK — so none of them add a dependency. All four handle
 multiple simultaneous tool calls in one response correctly (Anthropic/Bedrock
-bundle every result into a single following turn, as required).
+bundle every result into a single following turn, as required). Because the
+`openai` adapter only cares about the response shape, it also works against
+any OpenAI-compatible local server — verified live against a Docker-hosted
+Ollama running a 397MB model, see
+[`examples/ollama-adapter.mjs`](./examples/ollama-adapter.mjs).
 
 ### 6. See it wired into a real provider loop
 The snippet above validates a single call. For the full retry loop — sending the
@@ -341,6 +345,7 @@ disappear):
 | [`examples/gemini.mjs`](./examples/gemini.mjs) / [`-adapter`](./examples/gemini-adapter.mjs) | Google Gemini API | Satellite launch scheduling (non-infra) |
 | [`examples/pizza-order.mjs`](./examples/pizza-order.mjs) | AWS Bedrock Converse API | Pizza ordering (non-infra, to show the gate isn't AWS-specific) |
 | [`examples/langchain.mjs`](./examples/langchain.mjs) | LangChain (`@langchain/google-genai`) | Pet adoption — gate wrapped inside a LangChain `tool()` handler |
+| [`examples/ollama-adapter.mjs`](./examples/ollama-adapter.mjs) | Local model via Ollama (OpenAI-compatible endpoint) | EC2 instance restart |
 
 Each example requires only its provider's SDK and credentials — see
 [`examples/README.md`](./examples/README.md) for setup.
@@ -353,10 +358,8 @@ See the [Quick Start](#-quick-start) above for the Python install +
 core-API snippet. `agentic-gate` for Python also has the full feature set —
 circuit breaker, telemetry hooks, async external-state validation, and all
 four provider adapters (`agentic_gate.adapters.openai/anthropic/bedrock/gemini`)
-mirroring the JS ones above — the `openai` one is also verified working
-against local models (tested live against a 397MB model in a Docker-hosted
-Ollama, including OpenAI-compatible servers like vLLM/LM Studio in
-principle, since it works off the response shape, not the SDK). Source
+mirroring the JS ones above — see [`examples/ollama-adapter.mjs`](./examples/ollama-adapter.mjs)
+for the local-model story, verified live in both languages. Source
 lives in [`python/`](./python) in this same repo; see
 [`python/README.md`](./python/README.md) for the full API reference and
 [`python/examples/`](./python/examples) for runnable scripts.

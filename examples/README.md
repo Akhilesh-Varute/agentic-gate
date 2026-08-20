@@ -92,6 +92,27 @@ reconstructing the part yourself — dropping the signature causes a 400.
 `gemini-adapter.mjs` and `agentic-gate/adapters/gemini` already do this
 correctly, so you don't have to remember it.
 
+## Local models (Ollama, vLLM, LM Studio, ...) — `ollama-adapter.mjs`
+
+Verified live against a local Ollama container. The `openai` adapter doesn't
+import the `openai` package itself, so it works against anything exposing an
+OpenAI-compatible `/v1/chat/completions` endpoint — just point the official
+`openai` client's `baseURL` at your local server. Confirmed working with a
+397MB model (`qwen2.5:0.5b`), including a populated `tool_call.id` on the
+response (Ollama had a documented gap here historically — resolved on
+current versions).
+
+```bash
+docker run -d -p 11434:11434 --name ollama ollama/ollama
+docker exec ollama ollama pull qwen2.5:0.5b
+npm install openai
+npm run build
+node examples/ollama-adapter.mjs
+```
+
+Should work the same against vLLM/LM Studio's OpenAI-compatible endpoints,
+though only Ollama has been tested directly.
+
 ## LangChain — `langchain.mjs`
 
 Uses Gemini as the underlying model (same key/setup as `gemini.mjs` above),
