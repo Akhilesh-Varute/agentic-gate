@@ -10,6 +10,13 @@ self-correction loop looks across providers.
 length limits, to show the gate validates whatever Zod schema you give it —
 it has no AWS- or infra-specific behavior baked in.
 
+`langchain.mjs` shows a different *integration* pattern rather than a
+different domain: instead of manually parsing tool_calls off a raw model
+response (like every other example here), it wraps `gate.interceptAndExecute`
+directly inside a LangChain `tool()` handler and lets LangChain's own
+`tool.invoke(toolCall)` round-trip the result — the pattern you'd use if your
+agent is built with LangChain/LangGraph.
+
 All examples import from `../dist/index.js` (the local build). If you're
 using this outside of this repo, install the package instead:
 
@@ -67,6 +74,20 @@ Note: Gemini 3.x models attach a `thoughtSignature` to `functionCall` response
 parts. When replaying the model's turn back into `contents` for the next
 request, push `response.candidates[0].content` verbatim rather than
 reconstructing the part yourself — dropping the signature causes a 400.
+
+## LangChain — `langchain.mjs`
+
+Uses Gemini as the underlying model (same key/setup as `gemini.mjs` above),
+via `@langchain/google-genai`. Swap in `@langchain/openai` or
+`@langchain/anthropic` with the same `tool()`/`bindTools()` pattern if you'd
+rather use a different provider through LangChain.
+
+```bash
+npm install @langchain/core @langchain/google-genai
+npm run build
+export GEMINI_API_KEY=...      # PowerShell: $env:GEMINI_API_KEY = "..."
+node examples/langchain.mjs
+```
 
 ## Bedrock — `bedrock-converse.mjs` and `pizza-order.mjs`
 
