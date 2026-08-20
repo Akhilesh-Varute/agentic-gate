@@ -44,3 +44,20 @@ pip install anthropic
 export ANTHROPIC_API_KEY=sk-ant-...
 python examples/anthropic_example.py
 ```
+
+## Local models (Ollama, vLLM, LM Studio, ...) — `ollama_test.py`
+
+Verified live against a local Ollama container. The `openai` adapter doesn't
+import the `openai` package itself, so it works against anything exposing an
+OpenAI-compatible `/v1/chat/completions` endpoint — just point the official
+`openai` client's `base_url` at your local server. Confirmed working with a
+397MB model (`qwen2.5:0.5b`), including a populated `tool_call.id` on the
+response (Ollama had a documented gap here historically — resolved on
+current versions).
+
+```bash
+docker run -d -p 11434:11434 --name ollama ollama/ollama
+docker exec ollama ollama pull qwen2.5:0.5b
+pip install openai
+python examples/ollama_test.py
+```

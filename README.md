@@ -353,9 +353,13 @@ See the [Quick Start](#-quick-start) above for the Python install +
 core-API snippet. `agentic-gate` for Python also has the full feature set —
 circuit breaker, telemetry hooks, async external-state validation, and all
 four provider adapters (`agentic_gate.adapters.openai/anthropic/bedrock/gemini`)
-mirroring the JS ones above. Source lives in [`python/`](./python) in this
-same repo; see [`python/README.md`](./python/README.md) for the full API
-reference and [`python/examples/`](./python/examples) for runnable scripts.
+mirroring the JS ones above — the `openai` one is also verified working
+against local models (tested live against a 397MB model in a Docker-hosted
+Ollama, including OpenAI-compatible servers like vLLM/LM Studio in
+principle, since it works off the response shape, not the SDK). Source
+lives in [`python/`](./python) in this same repo; see
+[`python/README.md`](./python/README.md) for the full API reference and
+[`python/examples/`](./python/examples) for runnable scripts.
 
 ---
 
