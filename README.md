@@ -4,6 +4,7 @@
 
 [![npm version](https://img.shields.io/npm/v/agentic-gate.svg)](https://www.npmjs.com/package/agentic-gate)
 [![npm downloads](https://img.shields.io/npm/dm/agentic-gate.svg)](https://www.npmjs.com/package/agentic-gate)
+[![PyPI version](https://img.shields.io/pypi/v/agentic-gate.svg)](https://pypi.org/project/agentic-gate/)
 [![Node.js](https://img.shields.io/badge/Node.js-v18%2B-green.svg)](https://nodejs.org/)
 [![AWS Bedrock](https://img.shields.io/badge/AWS%20Bedrock-Converse%20API-orange.svg)](https://aws.amazon.com/bedrock/)
 [![Zod](https://img.shields.io/badge/Zod-Schema%20Validation-blue.svg)](https://zod.dev/)
@@ -302,6 +303,37 @@ disappear):
 
 Each example requires only its provider's SDK and credentials — see
 [`examples/README.md`](./examples/README.md) for setup.
+
+---
+
+## 🐍 Python
+
+`agentic-gate` is also available for Python — the same engine (circuit
+breaker, telemetry hooks, async external-state validation), ported to
+[Pydantic](https://docs.pydantic.dev/) instead of Zod:
+
+```bash
+pip install agentic-gate
+```
+
+```python
+from typing import Literal
+from pydantic import BaseModel
+from agentic_gate import AgenticGate
+
+class RestartEc2Args(BaseModel):
+    instance_id: str
+    region: Literal["us-east-1", "us-west-2", "ap-south-1"]
+
+gate = AgenticGate()
+gate.register_tool("restart_ec2_instance", RestartEc2Args, execute=restart_ec2)
+result = await gate.intercept_and_execute("restart_ec2_instance", raw_llm_args)
+```
+
+Source lives in [`python/`](./python) in this same repo; see
+[`python/README.md`](./python/README.md) for the full API. Provider adapters
+(the `agentic-gate/adapters/*` equivalents) aren't ported yet — the JS
+package is currently ahead on that front.
 
 ---
 
