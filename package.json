@@ -16,6 +16,8 @@
     "agentic",
     "bedrock",
     "openai",
+    "anthropic",
+    "gemini",
     "zod",
     "function-calling",
     "guardrails"

@@ -1,8 +1,8 @@
 # Examples
 
-`bedrock-converse.mjs`, `openai.mjs`, and `anthropic.mjs` all run the same
-scenario — asking an LLM to restart an EC2 instance in an unsupported region —
-through `AgenticGate`, so you can compare how the validation-gate +
+`bedrock-converse.mjs`, `openai.mjs`, `anthropic.mjs`, and `gemini.mjs` all run
+the same scenario — asking an LLM to restart an EC2 instance in an unsupported
+region — through `AgenticGate`, so you can compare how the validation-gate +
 self-correction loop looks across providers.
 
 `pizza-order.mjs` runs a completely unrelated, non-infra domain (ordering
@@ -50,6 +50,22 @@ npm run build
 export ANTHROPIC_API_KEY=sk-ant-...   # PowerShell: $env:ANTHROPIC_API_KEY = "sk-ant-..."
 node examples/anthropic.mjs
 ```
+
+## Gemini — `gemini.mjs`
+
+No CLI needed. Get a key from [Google AI Studio](https://aistudio.google.com/apikey).
+
+```bash
+npm install @google/genai
+npm run build
+export GEMINI_API_KEY=...      # PowerShell: $env:GEMINI_API_KEY = "..."
+node examples/gemini.mjs
+```
+
+Note: Gemini 3.x models attach a `thoughtSignature` to `functionCall` response
+parts. When replaying the model's turn back into `contents` for the next
+request, push `response.candidates[0].content` verbatim rather than
+reconstructing the part yourself — dropping the signature causes a 400.
 
 ## Bedrock — `bedrock-converse.mjs` and `pizza-order.mjs`
 
