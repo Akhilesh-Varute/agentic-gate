@@ -170,13 +170,20 @@ const validation = EC2RestartSchema.safeParse(call.args);
 
 ## 🚀 Quick Start
 
+`agentic-gate` ships for both JavaScript/TypeScript and Python — same engine,
+same guarantees, native API for each.
+
 ### 1. Install
+
 ```bash
-npm install agentic-gate zod
+npm install agentic-gate zod        # JS/TS
+pip install agentic-gate            # Python
 ```
 
 ### 2. Register a tool and intercept a call
-This is the core API — provider-agnostic, no AWS/network calls required:
+This is the core API — provider-agnostic, no AWS/network calls required.
+
+**JavaScript / TypeScript:**
 
 ```javascript
 import { AgenticGate } from "agentic-gate";
@@ -208,6 +215,40 @@ if (!result.success) {
   // Feed this string back into the LLM's message history so it can self-correct.
 }
 ```
+
+**Python:**
+
+```python
+from typing import Literal
+from pydantic import BaseModel
+from agentic_gate import AgenticGate
+
+class RestartEc2Args(BaseModel):
+    instance_id: str
+    region: Literal["us-east-1", "us-west-2", "ap-south-1"]
+
+gate = AgenticGate()
+
+async def restart_ec2(args: RestartEc2Args):
+    # Your real downstream call (boto3, an HTTP client, etc.)
+    return {"status": "success", "instance_id": args.instance_id, "region": args.region}
+
+gate.register_tool("restart_ec2_instance", RestartEc2Args, execute=restart_ec2)
+
+# Feed it raw, untrusted arguments straight from the LLM's tool-call payload
+result = await gate.intercept_and_execute("restart_ec2_instance", {
+    "instance_id": "i-0123456789abcdef0",
+    "region": "eu-central-1",  # not in the enum -> gate rejects before execute() runs
+})
+
+if not result.success:
+    print(result.error)
+    # "[Validation Gate Failed]: region: Input should be 'us-east-1', 'us-west-2' or 'ap-south-1'"
+    # Feed this string back into the LLM's message history so it can self-correct.
+```
+
+Full API reference, circuit breaker/telemetry examples, and provider adapters
+for Python are in [`python/README.md`](./python/README.md).
 
 ### 3. Circuit breaker + telemetry
 Configure both when constructing the gate:
@@ -306,34 +347,15 @@ Each example requires only its provider's SDK and credentials — see
 
 ---
 
-## 🐍 Python
+## 🐍 Python details
 
-`agentic-gate` is also available for Python — the same engine (circuit
-breaker, telemetry hooks, async external-state validation), ported to
-[Pydantic](https://docs.pydantic.dev/) instead of Zod:
-
-```bash
-pip install agentic-gate
-```
-
-```python
-from typing import Literal
-from pydantic import BaseModel
-from agentic_gate import AgenticGate
-
-class RestartEc2Args(BaseModel):
-    instance_id: str
-    region: Literal["us-east-1", "us-west-2", "ap-south-1"]
-
-gate = AgenticGate()
-gate.register_tool("restart_ec2_instance", RestartEc2Args, execute=restart_ec2)
-result = await gate.intercept_and_execute("restart_ec2_instance", raw_llm_args)
-```
-
-Source lives in [`python/`](./python) in this same repo; see
-[`python/README.md`](./python/README.md) for the full API. Provider adapters
-(the `agentic-gate/adapters/*` equivalents) aren't ported yet — the JS
-package is currently ahead on that front.
+See the [Quick Start](#-quick-start) above for the Python install +
+core-API snippet. `agentic-gate` for Python also has the full feature set —
+circuit breaker, telemetry hooks, async external-state validation, and all
+four provider adapters (`agentic_gate.adapters.openai/anthropic/bedrock/gemini`)
+mirroring the JS ones above. Source lives in [`python/`](./python) in this
+same repo; see [`python/README.md`](./python/README.md) for the full API
+reference and [`python/examples/`](./python/examples) for runnable scripts.
 
 ---
 
