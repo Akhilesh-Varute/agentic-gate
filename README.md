@@ -3,6 +3,7 @@
 > **A production-ready, model-agnostic proxy engine that enforces strict runtime execution bounds, schema validation gates, and self-correction loops for LLM Function Calling.**
 
 [![npm version](https://img.shields.io/npm/v/agentic-gate.svg)](https://www.npmjs.com/package/agentic-gate)
+[![CI](https://github.com/Akhilesh-Varute/agentic-gate/actions/workflows/ci.yml/badge.svg)](https://github.com/Akhilesh-Varute/agentic-gate/actions/workflows/ci.yml)
 [![npm downloads](https://img.shields.io/npm/dm/agentic-gate.svg)](https://www.npmjs.com/package/agentic-gate)
 [![PyPI version](https://img.shields.io/pypi/v/agentic-gate.svg)](https://pypi.org/project/agentic-gate/)
 [![Node.js](https://img.shields.io/badge/Node.js-v18%2B-green.svg)](https://nodejs.org/)
