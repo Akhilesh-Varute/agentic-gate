@@ -1,0 +1,120 @@
+{
+  "summary": {
+    "maxTurns": 50,
+    "maxConsecutiveFailures": 3,
+    "loop": {
+      "badCallsReachedSystemWithout": 150,
+      "badCallsReachedSystemWith": 0,
+      "modelTurnsWithout": 150,
+      "modelTurnsWith": 12
+    },
+    "selfCorrect": {
+      "badCallsReachedSystemWithout": 3,
+      "badCallsReachedSystemWith": 0
+    }
+  },
+  "results": [
+    {
+      "id": "support-refund",
+      "label": "Support refund",
+      "loop": {
+        "without": {
+          "turns": 50,
+          "downstreamCalls": 50,
+          "reachedBad": 50
+        },
+        "with": {
+          "turns": 4,
+          "downstreamCalls": 0,
+          "reachedBad": 0,
+          "circuitOpenAtTurn": 4,
+          "firstError": "[Validation Gate Failed]: orderId: orderId must look like ORD-123456; amount: Expected number, received string",
+          "lastError": "[Circuit Breaker OPEN]: Tool 'issue_refund' has failed 3 consecutive times. Call gate.resetCircuit(\"issue_refund\") once the underlying issue is resolved."
+        }
+      },
+      "selfCorrect": {
+        "without": {
+          "turns": 2,
+          "downstreamCalls": 2,
+          "reachedBad": 1
+        },
+        "with": {
+          "turns": 2,
+          "downstreamCalls": 1,
+          "reachedBad": 0,
+          "circuitOpenAtTurn": null,
+          "firstError": "[Validation Gate Failed]: orderId: orderId must look like ORD-123456; amount: Expected number, received string",
+          "lastError": "[Validation Gate Failed]: orderId: orderId must look like ORD-123456; amount: Expected number, received string"
+        }
+      }
+    },
+    {
+      "id": "payment-transfer",
+      "label": "Payment transfer",
+      "loop": {
+        "without": {
+          "turns": 50,
+          "downstreamCalls": 50,
+          "reachedBad": 50
+        },
+        "with": {
+          "turns": 4,
+          "downstreamCalls": 0,
+          "reachedBad": 0,
+          "circuitOpenAtTurn": 4,
+          "firstError": "[Validation Gate Failed]: amount: amount must be greater than 0; currency: currency must be one of INR, USD, EUR, GBP; executeOn: executeOn must be YYYY-MM-DD",
+          "lastError": "[Circuit Breaker OPEN]: Tool 'create_transfer' has failed 3 consecutive times. Call gate.resetCircuit(\"create_transfer\") once the underlying issue is resolved."
+        }
+      },
+      "selfCorrect": {
+        "without": {
+          "turns": 2,
+          "downstreamCalls": 2,
+          "reachedBad": 1
+        },
+        "with": {
+          "turns": 2,
+          "downstreamCalls": 1,
+          "reachedBad": 0,
+          "circuitOpenAtTurn": null,
+          "firstError": "[Validation Gate Failed]: amount: amount must be greater than 0; currency: currency must be one of INR, USD, EUR, GBP; executeOn: executeOn must be YYYY-MM-DD",
+          "lastError": "[Validation Gate Failed]: amount: amount must be greater than 0; currency: currency must be one of INR, USD, EUR, GBP; executeOn: executeOn must be YYYY-MM-DD"
+        }
+      }
+    },
+    {
+      "id": "coding-agent-loop",
+      "label": "Coding agent",
+      "loop": {
+        "without": {
+          "turns": 50,
+          "downstreamCalls": 50,
+          "reachedBad": 50
+        },
+        "with": {
+          "turns": 4,
+          "downstreamCalls": 0,
+          "reachedBad": 0,
+          "circuitOpenAtTurn": 4,
+          "firstError": "[Validation Gate Failed]: table: table must be one of orders, customers, invoices; limit: limit must be between 1 and 1000",
+          "lastError": "[Circuit Breaker OPEN]: Tool 'run_query' has failed 3 consecutive times. Call gate.resetCircuit(\"run_query\") once the underlying issue is resolved."
+        }
+      },
+      "selfCorrect": {
+        "without": {
+          "turns": 2,
+          "downstreamCalls": 2,
+          "reachedBad": 1
+        },
+        "with": {
+          "turns": 2,
+          "downstreamCalls": 1,
+          "reachedBad": 0,
+          "circuitOpenAtTurn": null,
+          "firstError": "[Validation Gate Failed]: table: table must be one of orders, customers, invoices; limit: limit must be between 1 and 1000",
+          "lastError": "[Validation Gate Failed]: table: table must be one of orders, customers, invoices; limit: limit must be between 1 and 1000"
+        }
+      }
+    }
+  ]
+}

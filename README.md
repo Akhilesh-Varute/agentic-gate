@@ -427,5 +427,9 @@ proposed a working alternative on its own.
 
 ---
 
+## Scope
+
+agentic-gate checks the **arguments** of a tool call before it runs, feeds validation errors back to the model, and stops repeated failures with a circuit breaker. It is one layer in an agent's safety design, and it works alongside the things you already have: authorization and permissions on the tools themselves, rate limits, and review of high-impact actions. A call that passes the schema is valid in shape; whether it is the right action for the user is still your application's decision.
+
 ## 📄 License
 This project is licensed under the [MIT License](LICENSE).
