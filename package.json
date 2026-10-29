@@ -30,6 +30,7 @@
   },
   "scripts": {
     "build": "tsc",
+    "prepare": "tsc",
     "test": "npm run build && node --test",
     "demo": "npm run build && node examples/bedrock-converse.mjs",
     "prepublishOnly": "npm run build"
