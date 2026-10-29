@@ -221,3 +221,47 @@ test("onGateSuccess and onGateFailure hooks fire with the right event shape", as
   assert.equal(events[0].consecutiveFailures, 1);
   assert.equal(events[2].data, 1);
 });
+
+test("malformed JSON string args are rejected as 'parse' and execute() never runs", async () => {
+  const reasons = [];
+  const gate = makeGate({ onGateFailure: (e) => reasons.push(e.reason) });
+  let executed = false;
+  gate.registerTool({
+    name: "double",
+    schema: z.object({ x: z.number() }),
+    execute: async ({ x }) => {
+      executed = true;
+      return x * 2;
+    },
+  });
+
+  const bad = await gate.interceptAndExecute("double", '{"x": 5');
+  assert.equal(bad.success, false);
+  assert.match(bad.error, /Argument Parse Failed/);
+  assert.equal(executed, false);
+  assert.deepEqual(reasons, ["parse"]);
+
+  const good = await gate.interceptAndExecute("double", '{"x": 5}');
+  assert.deepEqual(good, { success: true, data: 10 });
+});
+
+test("validate() timeout yields validation-unavailable and execute() never runs", async () => {
+  const reasons = [];
+  const gate = makeGate({ validateTimeoutMs: 20, onGateFailure: (e) => reasons.push(e.reason) });
+  let executed = false;
+  gate.registerTool({
+    name: "refund",
+    schema: z.object({ x: z.number() }),
+    validate: () => new Promise(() => {}),
+    execute: async () => {
+      executed = true;
+    },
+  });
+
+  const result = await gate.interceptAndExecute("refund", { x: 1 });
+  assert.equal(result.success, false);
+  assert.match(result.error, /Validation Unavailable/);
+  assert.doesNotMatch(result.error, /does not exist/);
+  assert.equal(executed, false);
+  assert.deepEqual(reasons, ["validation-unavailable"]);
+});

@@ -45,8 +45,8 @@ export async function handleResponse(
   const messages: unknown[] = [assistantMessage];
 
   for (const toolCall of toolCalls) {
-    const rawArgs = JSON.parse(toolCall.function.arguments);
-    const gateResult = await gate.interceptAndExecute(toolCall.function.name, rawArgs);
+    // Pass the JSON string through; the gate parses it so bad JSON is a retryable rejection.
+    const gateResult = await gate.interceptAndExecute(toolCall.function.name, toolCall.function.arguments);
 
     messages.push({
       role: "tool",

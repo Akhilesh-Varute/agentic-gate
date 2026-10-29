@@ -3,15 +3,19 @@ import { ToolDefinition, GateResult, GateOptions, GateFailureReason } from "./ty
 
 const DEFAULT_MAX_CONSECUTIVE_FAILURES = 3;
 
+class ValidateTimeout extends Error {}
+
 export class AgenticGate {
   private tools = new Map<string, ToolDefinition<any>>();
   private consecutiveFailures = new Map<string, number>();
   private readonly maxConsecutiveFailures: number;
+  private readonly validateTimeoutMs?: number;
   private readonly onGateSuccess?: GateOptions["onGateSuccess"];
   private readonly onGateFailure?: GateOptions["onGateFailure"];
 
   constructor(options: GateOptions = {}) {
     this.maxConsecutiveFailures = options.maxConsecutiveFailures ?? DEFAULT_MAX_CONSECUTIVE_FAILURES;
+    this.validateTimeoutMs = options.validateTimeoutMs;
     this.onGateSuccess = options.onGateSuccess;
     this.onGateFailure = options.onGateFailure;
   }
@@ -55,6 +59,21 @@ export class AgenticGate {
       );
     }
 
+    // Step 0.5: OpenAI-style endpoints send arguments as a JSON string; truncated
+    // or malformed strings get their own rejection reason, separate from schema errors.
+    if (typeof rawArguments === "string") {
+      try {
+        rawArguments = JSON.parse(rawArguments);
+      } catch (err: any) {
+        return this.fail(
+          toolName,
+          rawArguments,
+          "parse",
+          `[Argument Parse Failed]: arguments are not valid JSON (possibly truncated): ${err.message}`
+        );
+      }
+    }
+
     // Step 1: Intercept & Validate
     const parseResult = tool.schema.safeParse(rawArguments);
 
@@ -68,10 +87,31 @@ export class AgenticGate {
 
     // Step 2: Async External-State Validation (e.g. does this resource actually exist?)
     if (tool.validate) {
+      let timer: ReturnType<typeof setTimeout> | undefined;
       try {
-        await tool.validate(parseResult.data);
+        const check = tool.validate(parseResult.data);
+        if (this.validateTimeoutMs === undefined) {
+          await check;
+        } else {
+          await Promise.race([
+            check,
+            new Promise<never>((_, reject) => {
+              timer = setTimeout(() => reject(new ValidateTimeout()), this.validateTimeoutMs);
+            }),
+          ]);
+        }
       } catch (err: any) {
+        if (err instanceof ValidateTimeout) {
+          return this.fail(
+            toolName,
+            rawArguments,
+            "validation-unavailable",
+            `[Validation Unavailable]: the existence check timed out after ${this.validateTimeoutMs}ms. This does not mean the resource is invalid; retry later.`
+          );
+        }
         return this.fail(toolName, rawArguments, "async-validation", `[Async Validation Failed]: ${err.message || String(err)}`);
+      } finally {
+        clearTimeout(timer);
       }
     }
 

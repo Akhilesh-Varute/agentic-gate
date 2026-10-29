@@ -5,7 +5,15 @@ from typing import Any, Awaitable, Callable, Literal, Optional, Type
 
 from pydantic import BaseModel
 
-GateFailureReason = Literal["unregistered", "validation", "async-validation", "execution", "circuit-open"]
+GateFailureReason = Literal[
+    "unregistered",
+    "parse",
+    "validation",
+    "async-validation",
+    "validation-unavailable",
+    "execution",
+    "circuit-open",
+]
 
 
 @dataclass

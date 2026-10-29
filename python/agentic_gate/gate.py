@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+import json
 from typing import Any, Awaitable, Callable, Dict, Optional, Type
 
 from pydantic import BaseModel, ValidationError
@@ -13,12 +15,16 @@ class AgenticGate:
     def __init__(
         self,
         max_consecutive_failures: int = DEFAULT_MAX_CONSECUTIVE_FAILURES,
+        validate_timeout_s: Optional[float] = None,
         on_gate_success: Optional[Callable[[GateSuccessEvent], None]] = None,
         on_gate_failure: Optional[Callable[[GateFailureEvent], None]] = None,
     ) -> None:
         self._tools: Dict[str, ToolDefinition] = {}
         self._consecutive_failures: Dict[str, int] = {}
         self._max_consecutive_failures = max_consecutive_failures
+        # Max seconds a tool's async validate() may take; on timeout the call is
+        # rejected as "validation-unavailable" and execute() never runs. None = no timeout.
+        self._validate_timeout_s = validate_timeout_s
         self._on_gate_success = on_gate_success
         self._on_gate_failure = on_gate_failure
 
@@ -63,6 +69,19 @@ class AgenticGate:
                 f'times. Call gate.reset_circuit("{tool_name}") once the underlying issue is resolved.',
             )
 
+        # Step 0.5: OpenAI-style endpoints send arguments as a JSON string; truncated
+        # or malformed strings get their own rejection reason, separate from schema errors.
+        if isinstance(raw_arguments, str):
+            try:
+                raw_arguments = json.loads(raw_arguments)
+            except ValueError as err:
+                return self._fail(
+                    tool_name,
+                    raw_arguments,
+                    "parse",
+                    f"[Argument Parse Failed]: arguments are not valid JSON (possibly truncated): {err}",
+                )
+
         # Step 1: Intercept & Validate
         try:
             parsed = tool.schema.model_validate(raw_arguments)
@@ -75,7 +94,15 @@ class AgenticGate:
         # Step 2: Async External-State Validation (e.g. does this resource actually exist?)
         if tool.validate is not None:
             try:
-                await tool.validate(parsed)
+                await asyncio.wait_for(tool.validate(parsed), self._validate_timeout_s)
+            except asyncio.TimeoutError:
+                return self._fail(
+                    tool_name,
+                    raw_arguments,
+                    "validation-unavailable",
+                    f"[Validation Unavailable]: the existence check timed out after {self._validate_timeout_s}s. "
+                    "This does not mean the resource is invalid; retry later.",
+                )
             except Exception as err:  # noqa: BLE001 - deliberately broad, mirrors execute()'s catch
                 return self._fail(tool_name, raw_arguments, "async-validation", f"[Async Validation Failed]: {err}")
 

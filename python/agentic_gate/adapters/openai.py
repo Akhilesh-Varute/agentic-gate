@@ -28,8 +28,8 @@ async def handle_response(gate: AgenticGate, response: Any) -> AdapterOutcome:
     for call in tool_calls:
         function = get(call, "function")
         name = get(function, "name")
-        raw_args = json.loads(get(function, "arguments"))
-        gate_result = await gate.intercept_and_execute(name, raw_args)
+        # Pass the JSON string through; the gate parses it so bad JSON is a retryable rejection.
+        gate_result = await gate.intercept_and_execute(name, get(function, "arguments"))
 
         messages.append(
             {

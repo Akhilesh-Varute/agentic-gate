@@ -115,5 +115,61 @@ const summary = {
     badCallsReachedSystemWith: total((r) => r.selfCorrect.with.reachedBad),
   },
 };
-writeFileSync(new URL("./results.json", import.meta.url), JSON.stringify({ summary, results }, null, 2));
-console.log(JSON.stringify({ summary, results }, null, 2));
+// ---- Stage breakdown: valid calls must pass, invalid calls must be stopped, and we report which stage decided ----
+// A gate that rejects everything also scores 0 bad executions, so valid-call acceptance is measured too.
+async function runCase(c) {
+  let invocations = 0, reason = "accepted";
+  const gate = new AgenticGate({
+    maxConsecutiveFailures: 3,
+    validateTimeoutMs: 50,
+    onGateFailure: (e) => { reason = e.reason; },
+  });
+  gate.registerTool({
+    name: "issue_refund",
+    schema: scenarios[0].schema,
+    validate: c.validate,
+    execute: async () => { invocations++; return { ok: true }; },
+  });
+  const r = await gate.interceptAndExecute("issue_refund", c.args);
+  return { name: c.name, expectInvocations: c.expect, invocations, stage: reason, pass: invocations === c.expect, error: r.error ?? null };
+}
+
+const knownOrders = new Set(["ORD-482913"]);
+const lookup = async ({ orderId }) => { if (!knownOrders.has(orderId)) throw new Error(`Order '${orderId}' does not exist`); };
+const hang = () => new Promise(() => {});
+const caseList = [
+  { name: "negative amount", args: { orderId: "ORD-482913", amount: -5 }, validate: lookup, expect: 0 },
+  { name: "valid amount + existing order", args: { orderId: "ORD-482913", amount: 40 }, validate: lookup, expect: 1 },
+  { name: "valid amount + nonexistent order", args: { orderId: "ORD-000001", amount: 40 }, validate: lookup, expect: 0 },
+  { name: "valid amount + validator timeout", args: { orderId: "ORD-482913", amount: 40 }, validate: hang, expect: 0 },
+  { name: "valid call as JSON string", args: '{"orderId":"ORD-482913","amount":40}', validate: lookup, expect: 1 },
+  { name: "truncated JSON string", args: '{"orderId":"ORD-482913","amount":4', validate: lookup, expect: 0 },
+];
+const cases = [];
+for (const c of caseList) cases.push(await runCase(c));
+
+// Reworded repeats: same bad call with key order and an irrelevant extra key varied each turn.
+// The breaker counts consecutive failures per tool, so rewording does not reset or evade it.
+async function runReworded() {
+  let invocations = 0, circuitOpenAtTurn = null;
+  const gate = new AgenticGate({ maxConsecutiveFailures: 3 });
+  gate.registerTool({ name: "issue_refund", schema: scenarios[0].schema, execute: async () => { invocations++; return { ok: true }; } });
+  for (let turn = 1; turn <= MAX_TURNS; turn++) {
+    const args = turn % 2 ? { orderId: "latest", amount: -1 } : { amount: -1, note: `try ${turn}`, orderId: "latest" };
+    const r = await gate.interceptAndExecute("issue_refund", args);
+    if (r.error?.startsWith("[Circuit Breaker OPEN]")) { circuitOpenAtTurn = turn; break; }
+  }
+  return { invocations, circuitOpenAtTurn };
+}
+const reworded = await runReworded();
+
+const validCases = cases.filter((c) => c.expectInvocations === 1);
+const invalidCases = cases.filter((c) => c.expectInvocations === 0);
+const stageSummary = {
+  validCallAcceptanceRate: `${validCases.filter((c) => c.invocations === 1).length}/${validCases.length}`,
+  invalidCallEscapeRate: `${invalidCases.filter((c) => c.invocations > 0).length}/${invalidCases.length}`,
+  rewordedRepeat: reworded,
+};
+
+writeFileSync(new URL("./results.json", import.meta.url), JSON.stringify({ summary, results, stageSummary, cases }, null, 2));
+console.log(JSON.stringify({ summary, results, stageSummary, cases }, null, 2));

@@ -241,3 +241,46 @@ async def test_on_gate_success_and_on_gate_failure_hooks_fire_with_the_right_eve
     assert kinds == [("failure", "validation"), ("failure", "circuit-open"), ("success", None)]
     assert events[0][1].consecutive_failures == 1
     assert events[2][1].data == 1
+
+
+async def test_malformed_json_string_args_are_rejected_as_parse_and_execute_never_runs():
+    reasons = []
+    executed = []
+
+    async def run(args: DoubleArgs):
+        executed.append(args)
+        return args.x * 2
+
+    gate = AgenticGate(on_gate_failure=lambda e: reasons.append(e.reason))
+    gate.register_tool("double", DoubleArgs, execute=run)
+
+    bad = await gate.intercept_and_execute("double", '{"x": 5')
+    assert bad.success is False
+    assert "Argument Parse Failed" in bad.error
+    assert executed == []
+    assert reasons == ["parse"]
+
+    good = await gate.intercept_and_execute("double", '{"x": 5}')
+    assert good.success is True and good.data == 10
+
+
+async def test_validate_timeout_yields_validation_unavailable_and_execute_never_runs():
+    import asyncio
+
+    reasons = []
+    executed = []
+
+    async def hang(args: DoubleArgs):
+        await asyncio.sleep(5)
+
+    async def run(args: DoubleArgs):
+        executed.append(args)
+
+    gate = AgenticGate(validate_timeout_s=0.02, on_gate_failure=lambda e: reasons.append(e.reason))
+    gate.register_tool("refund", DoubleArgs, execute=run, validate=hang)
+
+    result = await gate.intercept_and_execute("refund", {"x": 1})
+    assert result.success is False
+    assert "Validation Unavailable" in result.error
+    assert executed == []
+    assert reasons == ["validation-unavailable"]

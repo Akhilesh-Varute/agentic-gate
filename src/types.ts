@@ -20,7 +20,14 @@ export interface GateResult<T = unknown> {
   error?: string;
 }
 
-export type GateFailureReason = "unregistered" | "validation" | "async-validation" | "execution" | "circuit-open";
+export type GateFailureReason =
+  | "unregistered"
+  | "parse"
+  | "validation"
+  | "async-validation"
+  | "validation-unavailable"
+  | "execution"
+  | "circuit-open";
 
 export interface GateSuccessEvent<T = unknown> {
   toolName: string;
@@ -44,6 +51,12 @@ export interface GateOptions {
    * Default: 3.
    */
   maxConsecutiveFailures?: number;
+  /**
+   * Max time in ms a tool's async validate() may take. On timeout the call is
+   * rejected with reason "validation-unavailable" and execute() never runs,
+   * so the model isn't told the resource doesn't exist. Default: no timeout.
+   */
+  validateTimeoutMs?: number;
   onGateSuccess?: (event: GateSuccessEvent) => void;
   onGateFailure?: (event: GateFailureEvent) => void;
 }

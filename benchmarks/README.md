@@ -41,6 +41,23 @@ With a self-correcting model, the bad first call reached the downstream system i
 
 The circuit breaker uses its default of 3 consecutive failures: calls 1 to 3 are rejected by validation, and call 4 is rejected by the open breaker, which is where the harness stops the agent.
 
+## Stage breakdown
+
+The headline numbers only count bad calls blocked, and a gate that rejects everything would score 0 there too. So the benchmark also runs valid calls that must reach the tool, and reports which stage decided each call (refund tool, with a lookup-style `validate()`):
+
+| Case | Tool invocations | Stage |
+|---|---|---|
+| Negative amount | 0 | `validation` |
+| Valid amount, existing order | 1 | accepted |
+| Valid amount, nonexistent order | 0 | `async-validation` |
+| Valid amount, validator timeout | 0 | `validation-unavailable` |
+| Valid call as a JSON string | 1 | accepted |
+| Truncated JSON string | 0 | `parse` |
+
+Result: valid-call acceptance 2/2, invalid-call escape 0/4.
+
+**Reworded repeats:** the same bad call resent with key order and an irrelevant extra key changed each turn still trips the breaker on turn 4, because it counts consecutive failures per tool, not per argument hash.
+
 ## Notes
 
 - "Without a gate" means calls go straight to the downstream function, with no validation.

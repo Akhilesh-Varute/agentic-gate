@@ -116,5 +116,63 @@
         }
       }
     }
+  ],
+  "stageSummary": {
+    "validCallAcceptanceRate": "2/2",
+    "invalidCallEscapeRate": "0/4",
+    "rewordedRepeat": {
+      "invocations": 0,
+      "circuitOpenAtTurn": 4
+    }
+  },
+  "cases": [
+    {
+      "name": "negative amount",
+      "expectInvocations": 0,
+      "invocations": 0,
+      "stage": "validation",
+      "pass": true,
+      "error": "[Validation Gate Failed]: amount: amount must be a positive number"
+    },
+    {
+      "name": "valid amount + existing order",
+      "expectInvocations": 1,
+      "invocations": 1,
+      "stage": "accepted",
+      "pass": true,
+      "error": null
+    },
+    {
+      "name": "valid amount + nonexistent order",
+      "expectInvocations": 0,
+      "invocations": 0,
+      "stage": "async-validation",
+      "pass": true,
+      "error": "[Async Validation Failed]: Order 'ORD-000001' does not exist"
+    },
+    {
+      "name": "valid amount + validator timeout",
+      "expectInvocations": 0,
+      "invocations": 0,
+      "stage": "validation-unavailable",
+      "pass": true,
+      "error": "[Validation Unavailable]: the existence check timed out after 50ms. This does not mean the resource is invalid; retry later."
+    },
+    {
+      "name": "valid call as JSON string",
+      "expectInvocations": 1,
+      "invocations": 1,
+      "stage": "accepted",
+      "pass": true,
+      "error": null
+    },
+    {
+      "name": "truncated JSON string",
+      "expectInvocations": 0,
+      "invocations": 0,
+      "stage": "parse",
+      "pass": true,
+      "error": "[Argument Parse Failed]: arguments are not valid JSON (possibly truncated): Expected ',' or '}' after property value in JSON at position 34"
+    }
   ]
 }
