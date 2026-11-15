@@ -110,8 +110,12 @@ class AgenticGate:
         try:
             output = await tool.execute(parsed)
             self._consecutive_failures.pop(tool_name, None)
+            # Telemetry must never change the outcome: execute() already ran.
             if self._on_gate_success:
-                self._on_gate_success(GateSuccessEvent(tool_name=tool_name, args=parsed, data=output))
+                try:
+                    self._on_gate_success(GateSuccessEvent(tool_name=tool_name, args=parsed, data=output))
+                except Exception:  # noqa: BLE001 - a broken metrics callback is not a tool failure
+                    pass
             return GateResult(success=True, data=output)
         except Exception as err:  # noqa: BLE001 - deliberately broad, mirrors gate.ts's catch
             return self._fail(tool_name, raw_arguments, "execution", f"[Execution Failed]: {err}")
@@ -129,13 +133,16 @@ class AgenticGate:
             self._consecutive_failures[tool_name] = consecutive_failures
 
         if self._on_gate_failure:
-            self._on_gate_failure(
-                GateFailureEvent(
-                    tool_name=tool_name,
-                    args=args,
-                    error=error,
-                    reason=reason,
-                    consecutive_failures=consecutive_failures,
+            try:
+                self._on_gate_failure(
+                    GateFailureEvent(
+                        tool_name=tool_name,
+                        args=args,
+                        error=error,
+                        reason=reason,
+                        consecutive_failures=consecutive_failures,
+                    )
                 )
-            )
+            except Exception:  # noqa: BLE001 - a broken logging callback must not mask the gate error
+                pass
         return GateResult(success=False, error=error)

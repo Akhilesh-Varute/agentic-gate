@@ -119,7 +119,9 @@ export class AgenticGate {
     try {
       const output = await tool.execute(parseResult.data);
       this.consecutiveFailures.delete(toolName);
-      this.onGateSuccess?.({ toolName, args: parseResult.data, data: output });
+      // Telemetry must never change the outcome: execute() already ran, so a
+      // throwing hook must not turn a real success into a reported failure.
+      this.safeHook(() => this.onGateSuccess?.({ toolName, args: parseResult.data, data: output }));
       return { success: true, data: output };
     } catch (err: any) {
       return this.fail(toolName, rawArguments, "execution", `[Execution Failed]: ${err.message || String(err)}`);
@@ -139,7 +141,15 @@ export class AgenticGate {
       this.consecutiveFailures.set(toolName, consecutiveFailures);
     }
 
-    this.onGateFailure?.({ toolName, args, error, reason, consecutiveFailures });
+    this.safeHook(() => this.onGateFailure?.({ toolName, args, error, reason, consecutiveFailures }));
     return { success: false, error };
+  }
+
+  private safeHook(fn: () => void): void {
+    try {
+      fn();
+    } catch {
+      // Swallow: a broken metrics/logging callback is the caller's bug, not a tool failure.
+    }
   }
 }

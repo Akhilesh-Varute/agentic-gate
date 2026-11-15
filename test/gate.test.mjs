@@ -265,3 +265,45 @@ test("validate() timeout yields validation-unavailable and execute() never runs"
   assert.equal(executed, false);
   assert.deepEqual(reasons, ["validation-unavailable"]);
 });
+
+test("a throwing onGateSuccess hook does not turn a successful execute() into a failure", async () => {
+  let runs = 0;
+  const gate = makeGate({
+    maxConsecutiveFailures: 1,
+    onGateSuccess: () => {
+      throw new Error("metrics backend down");
+    },
+  });
+  gate.registerTool({
+    name: "charge",
+    schema: z.object({ x: z.number() }),
+    execute: async ({ x }) => {
+      runs++;
+      return x;
+    },
+  });
+
+  const first = await gate.interceptAndExecute("charge", { x: 1 });
+  assert.deepEqual(first, { success: true, data: 1 });
+  // The breaker must not have been tripped by the hook error.
+  const second = await gate.interceptAndExecute("charge", { x: 2 });
+  assert.deepEqual(second, { success: true, data: 2 });
+  assert.equal(runs, 2);
+});
+
+test("a throwing onGateFailure hook still returns the gate's own error", async () => {
+  const gate = makeGate({
+    onGateFailure: () => {
+      throw new Error("logger exploded");
+    },
+  });
+  gate.registerTool({
+    name: "double",
+    schema: z.object({ x: z.number() }),
+    execute: async ({ x }) => x * 2,
+  });
+
+  const result = await gate.interceptAndExecute("double", { x: "nope" });
+  assert.equal(result.success, false);
+  assert.match(result.error, /Validation Gate Failed/);
+});
