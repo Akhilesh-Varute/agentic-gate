@@ -284,3 +284,37 @@ async def test_validate_timeout_yields_validation_unavailable_and_execute_never_
     assert "Validation Unavailable" in result.error
     assert executed == []
     assert reasons == ["validation-unavailable"]
+
+
+async def test_throwing_on_gate_success_does_not_turn_success_into_failure():
+    def boom(_event):
+        raise RuntimeError("metrics backend down")
+
+    gate = AgenticGate(max_consecutive_failures=1, on_gate_success=boom)
+    runs = []
+
+    async def execute(args):
+        runs.append(args.x)
+        return args.x
+
+    gate.register_tool(name="charge", schema=DoubleArgs, execute=execute)
+    first = await gate.intercept_and_execute("charge", {"x": 1})
+    second = await gate.intercept_and_execute("charge", {"x": 2})
+    assert first.success and first.data == 1
+    assert second.success and second.data == 2
+    assert runs == [1, 2]
+
+
+async def test_throwing_on_gate_failure_still_returns_the_gate_error():
+    def boom(_event):
+        raise RuntimeError("logger exploded")
+
+    gate = AgenticGate(on_gate_failure=boom)
+
+    async def execute(args):
+        return args.x * 2
+
+    gate.register_tool(name="double", schema=DoubleArgs, execute=execute)
+    result = await gate.intercept_and_execute("double", {"x": "nope"})
+    assert result.success is False
+    assert "Validation Gate Failed" in result.error
